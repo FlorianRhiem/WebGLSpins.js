@@ -12,7 +12,7 @@ WebGLSpins.js has no dependencies to other JavaScript files, but it requires bro
 
 ## Usage Examples
 
-A [static, minimal example](https://raw.githubusercontent.com/FlorianRhiem/WebGLSpins.js/master/examples/minimal.html) showing a single spin arrow:
+A [static, minimal example](https://florianrhiem.github.io/WebGLSpins.js/examples/minimal.html) showing a single spin arrow:
 
 ```html
 <canvas id="webgl-canvas" width="800" height="800"></canvas>
@@ -23,7 +23,7 @@ A [static, minimal example](https://raw.githubusercontent.com/FlorianRhiem/WebGL
 </script>
 ```
 
-For a more complex examples showing the different colormaps and animated spins, see this [demo](https://raw.githubusercontent.com/FlorianRhiem/WebGLSpins.js/master/examples/demo.html).
+For a more complex examples showing the different colormaps and animated spins, see this [demo](https://florianrhiem.github.io/WebGLSpins.js/examples/demo.html).
 
 ## Documentation
 
