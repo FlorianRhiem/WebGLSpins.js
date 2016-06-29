@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <title>WebGLSpins.js Demo</title>
+    <style>
+      html, body {
+        height:100%;
+        padding:0;
+        margin:0;
+        overflow:hidden;
+      }
+      #webgl-canvas {
+        width:100%;
+        height:100%;
+        margin:0;
+      }
+      #controls {
+        position:fixed;
+        left:0;
+        top:0;
+      }
+      #controls label {
+        color: white;
+        font-family: sans-serif;
+      }
+      #controls label:after {
+        content:':';
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="webgl-canvas" width="800" height="800"></canvas>
+    <div id="controls">
+      <label for="select-colormap">Colormap</label>
+      <select id="select-colormap">
+        <option value="red">Red</option>
+        <option value="redblue">Red-Blue</option>
+        <option value="hue">Hue</option>
+      </select>
+    </div>
+    <script
+        src="https://code.jquery.com/jquery-2.2.4.min.js"
+        integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44="
+        crossorigin="anonymous"></script>
+    <script src="../webglspins.min.js"></script>
+    <script type='text/javascript'>
+
+      function updateColormap() {
+        var colormap = $("option:selected", $('#select-colormap'))[0].value;
+        webglspins.updateOptions({
+          colormapImplementation: WebGLSpins.colormapImplementations[colormap]
+        });
+      }
+
+      $(document).ready(function() {
+        webglspins = new WebGLSpins(document.getElementById('webgl-canvas'), {
+          cameraLocation: [9, -4, 3],
+          centerLocation: [9, 10, 0],
+          upVector: [0, 0, 1]
+        });
+        updateColormap();
+        simulate();
+      });
+
+      $('#select-colormap').on('change', function (e) {
+        updateColormap();
+      });
+
+      var iteration = 0;
+      function simulate() {
+        var n = 5000;
+        iteration += 1;
+        var spinPositions = [];
+        var spinDirections = [];
+        for (var i = 0; i < n; i++) {
+          var row = Math.floor(i/10);
+          var column = i % 10;
+          var spinPosition = [2 * column, 2 * row, 0];
+          Array.prototype.push.apply(spinPositions, spinPosition);
+          var spinDirection = [0, Math.cos((row+iteration)*0.05), Math.sin((row+iteration)*0.05)];
+          Array.prototype.push.apply(spinDirections, spinDirection);
+        }
+        webglspins.updateSpins(n, spinPositions, spinDirections);
+        window.requestAnimationFrame(simulate);
+      }
+    </script>
+  </body>
+</html>
