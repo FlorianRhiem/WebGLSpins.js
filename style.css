@@ -1,0 +1,34 @@
+body {
+  font-family:sans-serif;
+  color:#222222;
+  max-width:970px;
+  margin:0 auto;
+}
+
+pre {
+	background-color: #F7F7F7;
+	margin: 0em 2em;
+	padding: 1em 1em;
+}
+
+a {
+	text-decoration:none;
+}
+
+table {
+	margin:2em 1em;
+}
+
+tr.odd {
+	background-color: #F7F7F7;
+}
+
+tr.even {
+	background-color: white;
+}
+td, th {
+	padding: 0.1em 0.3em;
+}
+table {
+	border-collapse:collapse;
+}

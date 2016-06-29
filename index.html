@@ -1,0 +1,184 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+  <style type="text/css">
+div.sourceCode { overflow-x: auto; }
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; line-height: 100%; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+code > span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code > span.dt { color: #902000; } /* DataType */
+code > span.dv { color: #40a070; } /* DecVal */
+code > span.bn { color: #40a070; } /* BaseN */
+code > span.fl { color: #40a070; } /* Float */
+code > span.ch { color: #4070a0; } /* Char */
+code > span.st { color: #4070a0; } /* String */
+code > span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code > span.ot { color: #007020; } /* Other */
+code > span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code > span.fu { color: #06287e; } /* Function */
+code > span.er { color: #ff0000; font-weight: bold; } /* Error */
+code > span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+code > span.cn { color: #880000; } /* Constant */
+code > span.sc { color: #4070a0; } /* SpecialChar */
+code > span.vs { color: #4070a0; } /* VerbatimString */
+code > span.ss { color: #bb6688; } /* SpecialString */
+code > span.im { } /* Import */
+code > span.va { color: #19177c; } /* Variable */
+code > span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code > span.op { color: #666666; } /* Operator */
+code > span.bu { } /* BuiltIn */
+code > span.ex { } /* Extension */
+code > span.pp { color: #bc7a00; } /* Preprocessor */
+code > span.at { color: #7d9029; } /* Attribute */
+code > span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code > span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code > span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+  </style>
+  <link rel="stylesheet" href="style.css" type="text/css" />
+</head>
+<body>
+<h1 id="webglspins.js">WebGLSpins.js</h1>
+<p>Rendering Spins using WebGL and JavaScript.</p>
+<h2 id="installation">Installation</h2>
+<p>Just <a href="https://raw.githubusercontent.com/FlorianRhiem/WebGLSpins.js/master/webglspins.min.js">download the minified JavaScript file</a> or clone this repository:</p>
+<pre class="shell"><code>git clone https://github.com/FlorianRhiem/WebGLSpins.js.git</code></pre>
+<p>WebGLSpins.js has no dependencies to other JavaScript files, but it requires browser support of <a href="https://www.khronos.org/webgl/">WebGL 1.0</a> and the <a href="http://www.khronos.org/registry/webgl/extensions/ANGLE_instanced_arrays/">ANGLE_instanced_arrays</a> extension.</p>
+<h2 id="usage-examples">Usage Examples</h2>
+<p>A <a href="https://florianrhiem.github.io/WebGLSpins.js/examples/minimal.html">static, minimal example</a> showing a single spin arrow:</p>
+<div class="sourceCode"><pre class="sourceCode html"><code class="sourceCode html"><span class="kw">&lt;canvas</span><span class="ot"> id=</span><span class="st">&quot;webgl-canvas&quot;</span><span class="ot"> width=</span><span class="st">&quot;800&quot;</span><span class="ot"> height=</span><span class="st">&quot;800&quot;</span><span class="kw">&gt;&lt;/canvas&gt;</span>
+<span class="kw">&lt;script</span><span class="ot"> src=</span><span class="st">&quot;webglspins.js&quot;</span><span class="kw">&gt;&lt;/script&gt;</span>
+<span class="kw">&lt;script</span><span class="ot"> type=</span><span class="st">&#39;text/javascript&#39;</span><span class="kw">&gt;</span>
+  <span class="kw">var</span> webglspins <span class="op">=</span> <span class="kw">new</span> <span class="at">WebGLSpins</span>(<span class="va">document</span>.<span class="at">getElementById</span>(<span class="st">&#39;webgl-canvas&#39;</span>))<span class="op">;</span>
+  <span class="va">webglspins</span>.<span class="at">updateSpins</span>(<span class="dv">1</span><span class="op">,</span> [<span class="dv">0</span><span class="op">,</span> <span class="dv">0</span><span class="op">,</span> <span class="dv">0</span>]<span class="op">,</span> [<span class="dv">1</span><span class="op">,</span> <span class="dv">0</span><span class="op">,</span> <span class="dv">0</span>])<span class="op">;</span>
+<span class="op">&lt;</span><span class="ss">/script&gt;</span></code></pre></div>
+<p>For a more complex examples showing the different colormaps and animated spins, see this <a href="https://florianrhiem.github.io/WebGLSpins.js/examples/demo.html">demo</a>.</p>
+<h2 id="documentation">Documentation</h2>
+<p>To render spins on a canvas element, first create a WebGLSpins object:</p>
+<pre class="js"><code>var webglspins = WebGLSpins(&lt;HTMLCanvasElement&gt; canvas, &lt;options&gt; options?);</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Options</th>
+<th align="center">Type</th>
+<th align="center">Default</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">coneHeight</td>
+<td align="center">Number</td>
+<td align="center">0.6</td>
+<td align="left">Height of the spin cone/arrow tip.</td>
+</tr>
+<tr class="even">
+<td align="left">coneRadius</td>
+<td align="center">Number</td>
+<td align="center">0.25</td>
+<td align="left">Radius of the spin cone/arrow tip.</td>
+</tr>
+<tr class="odd">
+<td align="left">cylinderHeight</td>
+<td align="center">Number</td>
+<td align="center">0.7</td>
+<td align="left">Height of the spin cylinder/arrow shaft.</td>
+</tr>
+<tr class="even">
+<td align="left">cylinderRadius</td>
+<td align="center">Number</td>
+<td align="center">0.125</td>
+<td align="left">Radius of the spin cylinder/arrow shaft.</td>
+</tr>
+<tr class="odd">
+<td align="left">levelOfDetail</td>
+<td align="center">Number</td>
+<td align="center">20</td>
+<td align="left">Number of sides for the spin arrow mesh. Must be at least three.</td>
+</tr>
+<tr class="even">
+<td align="left">verticalFieldOfView</td>
+<td align="center">Number</td>
+<td align="center">45.0</td>
+<td align="left">Vertical field of view of camera.</td>
+</tr>
+<tr class="odd">
+<td align="left">allowCameraMovement</td>
+<td align="center">Boolean</td>
+<td align="center">true</td>
+<td align="left">Enable/Disable moving the camera using the mouse and the shift and alt keys.</td>
+</tr>
+<tr class="even">
+<td align="left">colormapImplementation</td>
+<td align="center">String</td>
+<td align="center">red (see below)</td>
+<td align="left">GLSL code for mapping spin direction to a color.</td>
+</tr>
+<tr class="odd">
+<td align="left">cameraLocation</td>
+<td align="center">Array</td>
+<td align="center">[0.0, 0.0, 1.0]</td>
+<td align="left">Location of the camera.</td>
+</tr>
+<tr class="even">
+<td align="left">centerLocation</td>
+<td align="center">Array</td>
+<td align="center">[0.0, 0.0, 0.0]</td>
+<td align="left">Location fo the point the camera is looking at.</td>
+</tr>
+<tr class="odd">
+<td align="left">upVector</td>
+<td align="center">Array</td>
+<td align="center">[0.0, 1.0, 0.0]</td>
+<td align="left">Direction that should be up.</td>
+</tr>
+<tr class="even">
+<td align="left">backgroundColor</td>
+<td align="center">Array</td>
+<td align="center">[0.0, 0.0, 0.0]</td>
+<td align="left">Color of the background.</td>
+</tr>
+</tbody>
+</table>
+<p>To change these options later on, use:</p>
+<pre class="js"><code>webglspins.updateOptions(&lt;options&gt; options);</code></pre>
+<p>Use the following function to set the spin positions and directions:</p>
+<pre class="js"><code>webglspins.updateSpins(&lt;Number&gt; n, &lt;Array&gt; spinPositions, &lt;Array&gt; spinDirections);</code></pre>
+<h3 id="colormap-implementations">Colormap implementations</h3>
+<p>There are three colormaps already available, basically as templates for your own: <code>red</code>, <code>redblue</code> and <code>hue</code>. These can be accessed as attributes of <code>WebGLSpins.colormapImplementations</code>.</p>
+<h4 id="colormap-red">Colormap 'red'</h4>
+<div class="sourceCode"><pre class="sourceCode glsl"><code class="sourceCode glsl"><span class="dt">vec3</span> <span class="fu">colormap</span>(<span class="dt">vec3</span> direction) {
+  <span class="kw">return</span> <span class="dt">vec3</span>(<span class="fl">1.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>);
+}</code></pre></div>
+<h4 id="colormap-redblue">Colormap 'redblue'</h4>
+<p>A transition from red for positive z to blue for negative z direction.</p>
+<div class="sourceCode"><pre class="sourceCode glsl"><code class="sourceCode glsl"><span class="dt">vec3</span> <span class="fu">colormap</span>(<span class="dt">vec3</span> direction) {
+  <span class="dt">vec3</span> color_down = <span class="dt">vec3</span>(<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">1.0</span>);
+  <span class="dt">vec3</span> color_up = <span class="dt">vec3</span>(<span class="fl">1.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>);
+  <span class="kw">return</span> <span class="fu">mix</span>(color_down, color_up, direction.<span class="fu">z</span>*<span class="fl">0.5+0.5</span>);
+}</code></pre></div>
+<h4 id="colormap-hue">Colormap 'hue'</h4>
+<p>The angle between z and y is mapped to a hue value between 0 and 1, with a positive z direction resulting in red.</p>
+<div class="sourceCode"><pre class="sourceCode glsl"><code class="sourceCode glsl"><span class="dt">float</span> <span class="fu">atan2</span>(<span class="dt">float</span> y, <span class="dt">float</span> x) {
+  <span class="kw">return</span> x == <span class="fl">0.0</span> ? <span class="fu">sign</span>(y)*<span class="fl">3.14159</span>/<span class="fl">2.0</span> : <span class="fu">atan</span>(y, x);
+}
+<span class="dt">vec3</span> <span class="fu">hsv2rgb</span>(<span class="dt">vec3</span> c) {
+  <span class="dt">vec4</span> K = <span class="dt">vec4</span>(<span class="fl">1.0</span>, <span class="fl">2.0</span> / <span class="fl">3.0</span>, <span class="fl">1.0</span> / <span class="fl">3.0</span>, <span class="fl">3.0</span>);
+  <span class="dt">vec3</span> p = <span class="fu">abs</span>(<span class="fu">fract</span>(c.<span class="fu">xxx</span> + K.<span class="fu">xyz</span>) * <span class="fl">6.0</span> - K.<span class="fu">www</span>);
+  <span class="kw">return</span> c.<span class="fu">z</span> * <span class="fu">mix</span>(K.<span class="fu">xxx</span>, <span class="fu">clamp</span>(p - K.<span class="fu">xxx</span>, <span class="fl">0.0</span>, <span class="fl">1.0</span>), c.<span class="fu">y</span>);
+}
+<span class="dt">vec3</span> <span class="fu">colormap</span>(<span class="dt">vec3</span> direction) {
+  <span class="dt">vec2</span> xy = <span class="fu">normalize</span>(direction.<span class="fu">yz</span>);
+  <span class="dt">float</span> hue = <span class="fu">atan2</span>(xy.<span class="fu">x</span>, xy.<span class="fu">y</span>) / <span class="fl">3.14159</span> / <span class="fl">2.0</span>;
+  <span class="kw">return</span> <span class="fu">hsv2rgb</span>(<span class="dt">vec3</span>(hue, <span class="fl">1.0</span>, <span class="fl">1.0</span>));
+}</code></pre></div>
+</body>
+</html>
