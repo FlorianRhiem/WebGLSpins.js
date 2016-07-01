@@ -79,6 +79,7 @@ WebGLSpins.prototype.draw = function() {
     this._canvas.height = height;
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     // Redraw
+    gl.clearColor(this._options.backgroundColor[0], this._options.backgroundColor[1], this._options.backgroundColor[2], 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     if (this._numInstances <= 0) {
@@ -171,7 +172,6 @@ WebGLSpins.prototype._initGLContext = function() {
     }
     this._gl = gl;
 
-    gl.clearColor(this._options.backgroundColor[0], this._options.backgroundColor[1], this._options.backgroundColor[2], 1.0);
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
     gl.enable(gl.CULL_FACE);
