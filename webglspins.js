@@ -450,9 +450,9 @@ WebGLSpins.prototype._handleMouseMove = function(event) {
         this._options.upVector = WebGLSpins._normalize(this._options.upVector);
         if (event.altKey) {
             var translation =  [
-                    deltaY / 100 * this._options.upVector[0] - deltaX / 100 * rightVector[0],
-                    deltaY / 100 * this._options.upVector[1] - deltaX / 100 * rightVector[1],
-                    deltaY / 100 * this._options.upVector[2] - deltaX / 100 * rightVector[2]];
+                (deltaY / 100 * this._options.upVector[0] - deltaX / 100 * rightVector[0])*cameraDistance*0.1,
+                (deltaY / 100 * this._options.upVector[1] - deltaX / 100 * rightVector[1])*cameraDistance*0.1,
+                (deltaY / 100 * this._options.upVector[2] - deltaX / 100 * rightVector[2])*cameraDistance*0.1];
             this._options.cameraLocation[0] += translation[0];
             this._options.cameraLocation[1] += translation[1];
             this._options.cameraLocation[2] += translation[2];
