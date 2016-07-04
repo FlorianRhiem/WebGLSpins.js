@@ -38,6 +38,11 @@
         <option value="redblue">Red-Blue</option>
         <option value="hue">Hue</option>
       </select>
+      <label for="select-rendermode">Rendermode</label>
+      <select id="select-rendermode">
+        <option value="ARROWS">Arrows</option>
+        <option value="SURFACE">Surface</option>
+      </select>
     </div>
     <script
         src="https://code.jquery.com/jquery-2.2.4.min.js"
@@ -53,6 +58,13 @@
         });
       }
 
+      function updateRenderMode() {
+        var renderMode = $("option:selected", $('#select-rendermode'))[0].value;
+        webglspins.updateOptions({
+          renderMode: WebGLSpins.renderModes[renderMode]
+        });
+      }
+
       $(document).ready(function() {
         webglspins = new WebGLSpins(document.getElementById('webgl-canvas'), {
           cameraLocation: [9, -4, 3],
@@ -60,11 +72,16 @@
           upVector: [0, 0, 1]
         });
         updateColormap();
+        updateRenderMode();
         simulate();
       });
 
       $('#select-colormap').on('change', function (e) {
         updateColormap();
+      });
+
+      $('#select-rendermode').on('change', function (e) {
+        updateRenderMode();
       });
 
       var iteration = 0;
@@ -82,6 +99,10 @@
           Array.prototype.push.apply(spinDirections, spinDirection);
         }
         webglspins.updateSpins(spinPositions, spinDirections);
+        var NX = 10;
+        var NY = 500;
+        var surfaceIndices = WebGLSpins.generateCartesianSurfaceIndices(NX, NY);
+        webglspins.updateOptions({surfaceIndices: surfaceIndices});
         window.requestAnimationFrame(simulate);
       }
     </script>
