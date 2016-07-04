@@ -58,6 +58,7 @@ WebGLSpins.defaultOptions.cameraLocation = [0, 0, 1];
 WebGLSpins.defaultOptions.centerLocation = [0, 0, 0];
 WebGLSpins.defaultOptions.upVector = [0, 1, 0];
 WebGLSpins.defaultOptions.backgroundColor = [0, 0, 0];
+WebGLSpins.defaultOptions.zRange = [-1, 1];
 
 WebGLSpins.prototype.updateOptions = function(options) {
     var changedOptions = [];
@@ -423,6 +424,7 @@ WebGLSpins._ArrowRenderer.prototype.draw = function() {
     gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uModelviewMatrix"), false, WebGLSpins._toFloat32Array(modelviewMatrix));
     var lightPosition = WebGLSpins._matrixMultiply(modelviewMatrix, this._options.cameraLocation);
     gl.uniform3f(gl.getUniformLocation(this._program, "uLightPosition"), lightPosition[0], lightPosition[1], lightPosition[2]);
+    gl.uniform2f(gl.getUniformLocation(this._program, "uZRange"), this._options.zRange[0], this._options.zRange[1]);
 
     gl.drawElementsInstanced(gl.TRIANGLES, this._numIndices, gl.UNSIGNED_SHORT, null, this._numInstances);
 };
@@ -480,6 +482,7 @@ WebGLSpins._ArrowRenderer.prototype._updateShaderProgram = function() {
         
         uniform mat4 uProjectionMatrix;
         uniform mat4 uModelviewMatrix;
+        uniform vec2 uZRange;
         attribute vec3 ivPosition;
         attribute vec3 ivNormal;
         attribute vec3 ivInstanceOffset;
@@ -513,7 +516,11 @@ WebGLSpins._ArrowRenderer.prototype._updateShaderProgram = function() {
           mat3 instanceMatrix = matrixFromDirection(ivInstanceDirection);
           vfNormal = (uModelviewMatrix * vec4(instanceMatrix*ivNormal, 0.0)).xyz;
           vfPosition = (uModelviewMatrix * vec4(instanceMatrix*ivPosition+ivInstanceOffset, 1.0)).xyz;
-          gl_Position = uProjectionMatrix * vec4(vfPosition, 1.0);
+          if (ivInstanceDirection.z >= uZRange.x && ivInstanceDirection.z <= uZRange.y) {
+            gl_Position = uProjectionMatrix * vec4(vfPosition, 1.0);
+          } else {
+            gl_Position = vec4(2.0, 2.0, 2.0, 0.0);
+          }
         }
     `+this._options.colormapImplementation);
     gl.compileShader(vertexShader);
@@ -750,6 +757,7 @@ WebGLSpins._SurfaceRenderer.prototype.draw = function() {
     gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uProjectionMatrix"), false, WebGLSpins._toFloat32Array(projectionMatrix));
     var modelviewMatrix = WebGLSpins._lookAtMatrix(this._options.cameraLocation, this._options.centerLocation, this._options.upVector);
     gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uModelviewMatrix"), false, WebGLSpins._toFloat32Array(modelviewMatrix));
+    gl.uniform2f(gl.getUniformLocation(this._program, "uZRange"), this._options.zRange[0], this._options.zRange[1]);
 
     gl.disable(gl.CULL_FACE);
     gl.drawElements(gl.TRIANGLES, this._numIndices, gl.UNSIGNED_INT, null);
@@ -816,13 +824,18 @@ WebGLSpins._SurfaceRenderer.prototype._updateShaderProgram = function() {
         #version 100
         precision highp float;
         
+        uniform vec2 uZRange;
         varying vec3 vfDirection;
         
         vec3 colormap(vec3 direction);
         
         void main(void) {
-          vec3 color = colormap(normalize(vfDirection));
-          gl_FragColor = vec4(color, 1.0);
+          if (vfDirection.z >= uZRange.x && vfDirection.z <= uZRange.y) {
+            vec3 color = colormap(normalize(vfDirection));
+            gl_FragColor = vec4(color, 1.0);
+          } else {
+            discard;
+          }
         }
     `+this._options.colormapImplementation);
     gl.compileShader(fragmentShader);

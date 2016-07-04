@@ -42,6 +42,7 @@ var webglspins = WebGLSpins(<HTMLCanvasElement> canvas, <options> options?);
 | backgroundColor | Array | [0.0, 0.0, 0.0] | Color of the background. |
 | colormapImplementation | String | red&nbsp;(see&nbsp;below) | GLSL code for mapping spin direction to a color. |
 | renderMode | Function | Arrows&nbsp;(see&nbsp;below) | Render mode. |
+| zRange | Array | [-1, 1] | The range of visible z values. Spins with a direction z component outside this range will not be rendered. |
 
 Arrow render mode options:
 
