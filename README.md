@@ -54,7 +54,7 @@ webglspins.updateOptions(<options> options);
 
 Use the following function to set the spin positions and directions:
 ```js
-webglspins.updateSpins(<Number> n, <Array> spinPositions, <Array> spinDirections);
+webglspins.updateSpins(<Array> spinPositions, <Array> spinDirections);
 ```
 
 ### Colormap implementations

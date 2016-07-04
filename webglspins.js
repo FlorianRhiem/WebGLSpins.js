@@ -60,11 +60,21 @@ WebGLSpins.prototype.updateOptions = function(options) {
     this.draw();
 };
 
-WebGLSpins.prototype.updateSpins = function(numInstances, instancePositions, instanceDirections) {
+WebGLSpins.prototype.updateSpins = function(instancePositions, instanceDirections) {
     var gl = this._gl;
-    this._numInstances = numInstances;
+    var instancePositionArray = new Float32Array(instancePositions);
+    var instanceDirectionArray = new Float32Array(instanceDirections);
+    if (instancePositionArray.length != instanceDirectionArray.length) {
+        console.error("instancePositions and instanceDirections need to be of equal length");
+        return;
+    }
+    if ((instancePositionArray.length % 3) != 0) {
+        console.error("The length of instancePositions and instanceDirections needs to be a multiple of 3");
+        return;
+    }
+    this._numInstances = instancePositionArray.length/3;
     gl.bindBuffer(gl.ARRAY_BUFFER, this._instancePositionVbo);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(instancePositions), gl.STREAM_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, instancePositionArray, gl.STREAM_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, this._instanceDirectionVbo);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(instanceDirections), gl.STREAM_DRAW);
     this.draw();
@@ -106,8 +116,6 @@ WebGLSpins.prototype.draw = function() {
 
     gl.useProgram(this._program);
 
-    //var projectionMatrix = mat4.create();
-    //mat4.perspective(projectionMatrix, this._options.verticalFieldOfView, width / height, 0.1, 10000);
     var projectionMatrix = WebGLSpins._perspectiveProjectionMatrix(this._options.verticalFieldOfView, width / height, 0.1, 10000);
     gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uProjectionMatrix"), false, WebGLSpins._toFloat32Array(projectionMatrix));
     var modelviewMatrix = WebGLSpins._lookAtMatrix(this._options.cameraLocation, this._options.centerLocation, this._options.upVector);
