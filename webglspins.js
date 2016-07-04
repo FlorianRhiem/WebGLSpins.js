@@ -2,32 +2,14 @@
 
 function WebGLSpins(canvas, options) {
     this._canvas = canvas;
-    var defaultOptions = {
-        coneHeight: 0.6,
-        coneRadius: 0.25,
-        cylinderHeight: 0.7,
-        cylinderRadius: 0.125,
-        levelOfDetail: 20,
-        verticalFieldOfView: 45,
-        allowCameraMovement: true,
-        colormapImplementation: WebGLSpins.colormapImplementations['red'],
-        cameraLocation: [0, 0, 1],
-        centerLocation: [0, 0, 0],
-        upVector: [0, 1, 0],
-        backgroundColor: [0, 0, 0]
-    };
     this._options = {};
-    this._mergeOptions(options, defaultOptions);
+    this._mergeOptions(options, WebGLSpins.defaultOptions);
     this._gl = null;
     this._gl_initialized = false;
-    this._program = null;
-    this._vbo = null;
-    this._ibo = null;
-    this._instancePositionVbo = 0;
-    this._instanceDirectionVbo = 0;
-    this._numIndices = 0;
-    this._numInstances = 0;
+    this._renderer = new this._options.renderMode(this);
     this._initGLContext();
+    this._instancePositionArray = null;
+    this._instanceDirectionArray = null;
 
     this._mouseDown = false;
     this._lastMouseX = null;
@@ -38,85 +20,6 @@ function WebGLSpins(canvas, options) {
     canvas.addEventListener('mousemove', this._handleMouseMove.bind(this));
     document.addEventListener('mouseup', this._handleMouseUp.bind(this));
 }
-
-WebGLSpins.prototype.updateOptions = function(options) {
-    var optionsChanged = false;
-    for (var option in options) {
-        if (this._options.hasOwnProperty(option)) {
-            if (this._options[option] !== options[option]) {
-                this._options[option] = options[option];
-                optionsChanged = true;
-            }
-        } else {
-            console.warn("WebGLSpins does not recognize option '" + option +"'.");
-        }
-    }
-    if (optionsChanged) {
-        this._updateVertexData();
-    }
-    if (options.hasOwnProperty('colormapImplementation')) {
-        this._updateShaderProgram();
-    }
-    this.draw();
-};
-
-WebGLSpins.prototype.updateSpins = function(numInstances, instancePositions, instanceDirections) {
-    var gl = this._gl;
-    this._numInstances = numInstances;
-    gl.bindBuffer(gl.ARRAY_BUFFER, this._instancePositionVbo);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(instancePositions), gl.STREAM_DRAW);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this._instanceDirectionVbo);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(instanceDirections), gl.STREAM_DRAW);
-    this.draw();
-};
-
-WebGLSpins.prototype.draw = function() {
-    var gl = this._gl;
-    // Adjust framebuffer resolution to canvas resolution
-    var width = this._canvas.clientWidth;
-    var height = this._canvas.clientHeight;
-    this._canvas.width = width;
-    this._canvas.height = height;
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    // Redraw
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-    if (this._numInstances <= 0) {
-        return;
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, this._vbo);
-    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 4*3*2, 0);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 4*3*2, 4*3);
-    gl.enableVertexAttribArray(1);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, this._instancePositionVbo);
-    gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(2);
-    gl.vertexAttribDivisor(2, 1);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, this._instanceDirectionVbo);
-    gl.vertexAttribPointer(3, 3, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(3);
-    gl.vertexAttribDivisor(3, 1);
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._ibo);
-
-    gl.useProgram(this._program);
-
-    //var projectionMatrix = mat4.create();
-    //mat4.perspective(projectionMatrix, this._options.verticalFieldOfView, width / height, 0.1, 10000);
-    var projectionMatrix = WebGLSpins._perspectiveProjectionMatrix(this._options.verticalFieldOfView, width / height, 0.1, 10000);
-    gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uProjectionMatrix"), false, WebGLSpins._toFloat32Array(projectionMatrix));
-    var modelviewMatrix = WebGLSpins._lookAtMatrix(this._options.cameraLocation, this._options.centerLocation, this._options.upVector);
-    gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uModelviewMatrix"), false, WebGLSpins._toFloat32Array(modelviewMatrix));
-    var lightPosition = WebGLSpins._matrixMultiply(modelviewMatrix, this._options.cameraLocation);
-    gl.uniform3f(gl.getUniformLocation(this._program, "uLightPosition"), lightPosition[0], lightPosition[1], lightPosition[2]);
-
-    gl.drawElementsInstanced(gl.TRIANGLES, this._numIndices, gl.UNSIGNED_SHORT, null, this._numInstances);
-
-};
 
 WebGLSpins.colormapImplementations = {
     'red': `
@@ -145,6 +48,72 @@ WebGLSpins.colormapImplementations = {
         }`
 };
 
+WebGLSpins.renderModes = {};
+
+WebGLSpins.defaultOptions = {};
+WebGLSpins.defaultOptions.verticalFieldOfView = 45;
+WebGLSpins.defaultOptions.allowCameraMovement = true;
+WebGLSpins.defaultOptions.colormapImplementation = WebGLSpins.colormapImplementations['red'];
+WebGLSpins.defaultOptions.cameraLocation = [0, 0, 1];
+WebGLSpins.defaultOptions.centerLocation = [0, 0, 0];
+WebGLSpins.defaultOptions.upVector = [0, 1, 0];
+WebGLSpins.defaultOptions.backgroundColor = [0, 0, 0];
+
+WebGLSpins.prototype.updateOptions = function(options) {
+    var changedOptions = [];
+    for (var option in options) {
+        if (this._options.hasOwnProperty(option)) {
+            if (this._options[option] !== options[option]) {
+                this._options[option] = options[option];
+                changedOptions.push(option);
+            }
+        } else {
+            console.warn("WebGLSpins does not recognize option '" + option +"'.");
+        }
+    }
+    if (changedOptions.length == 0) {
+        return;
+    }
+    if (changedOptions.indexOf('renderMode') != -1) {
+        this._renderer.cleanup();
+        this._renderer = new this._options.renderMode(this);
+    } else {
+        this._renderer.optionsHaveChanged(changedOptions);
+    }
+    this.draw();
+};
+
+WebGLSpins.prototype.updateSpins = function(instancePositions, instanceDirections) {
+    var gl = this._gl;
+    this._instancePositionArray = new Float32Array(instancePositions);
+    this._instanceDirectionArray = new Float32Array(instanceDirections);
+    if (this._instancePositionArray.length != this._instanceDirectionArray.length) {
+        console.error("instancePositions and instanceDirections need to be of equal length");
+        return;
+    }
+    if ((this._instancePositionArray.length % 3) != 0) {
+        console.error("The length of instancePositions and instanceDirections needs to be a multiple of 3");
+        return;
+    }
+    this._renderer.updateSpins(this._instancePositionArray, this._instanceDirectionArray);
+    this.draw();
+};
+
+WebGLSpins.prototype.draw = function() {
+    var gl = this._gl;
+    // Adjust framebuffer resolution to canvas resolution
+    var width = this._canvas.clientWidth;
+    var height = this._canvas.clientHeight;
+    this._canvas.width = width;
+    this._canvas.height = height;
+    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    // Redraw
+    gl.clearColor(this._options.backgroundColor[0], this._options.backgroundColor[1], this._options.backgroundColor[2], 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    this._renderer.draw();
+};
+
 WebGLSpins.prototype._mergeOptions = function(options, defaultOptions) {
     this._options = {};
     for (var option in defaultOptions) {
@@ -171,11 +140,295 @@ WebGLSpins.prototype._initGLContext = function() {
     }
     this._gl = gl;
 
-    gl.clearColor(this._options.backgroundColor[0], this._options.backgroundColor[1], this._options.backgroundColor[2], 1.0);
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
     gl.enable(gl.CULL_FACE);
 
+    this._renderer.initGLContext();
+
+    this._gl_initialized = true;
+};
+
+// ---------------------------- Camera Movement -------------------------------
+
+WebGLSpins.prototype._handleMouseDown = function(event) {
+    if (!this._options.allowCameraMovement) {
+        return;
+    }
+    this._mouseDown = true;
+    this._lastMouseX = event.clientX;
+    this._lastMouseY = event.clientY;
+};
+
+WebGLSpins.prototype._handleMouseUp = function(event) {
+    this._mouseDown = false;
+};
+
+WebGLSpins.prototype._handleMouseMove = function(event) {
+    if (!this._options.allowCameraMovement) {
+        return;
+    }
+    if (!this._mouseDown) {
+      return;
+    }
+    var newX = event.clientX;
+    var newY = event.clientY;
+    var deltaX = newX - this._lastMouseX;
+    var deltaY = newY - this._lastMouseY;
+    if (event.shiftKey) {
+        this.zoom(deltaY > 0 ? 1 : -1);
+    } else {
+        var forwardVector = WebGLSpins._difference(this._options.centerLocation, this._options.cameraLocation);
+        var cameraDistance = WebGLSpins._length(forwardVector);
+        forwardVector = WebGLSpins._normalize(forwardVector);
+        this._options.upVector = WebGLSpins._normalize(this._options.upVector);
+        var rightVector = WebGLSpins._cross(forwardVector, this._options.upVector);
+        this._options.upVector = WebGLSpins._cross(rightVector, forwardVector);
+        this._options.upVector = WebGLSpins._normalize(this._options.upVector);
+        if (event.altKey) {
+            var translation =  [
+                (deltaY / 100 * this._options.upVector[0] - deltaX / 100 * rightVector[0])*cameraDistance*0.1,
+                (deltaY / 100 * this._options.upVector[1] - deltaX / 100 * rightVector[1])*cameraDistance*0.1,
+                (deltaY / 100 * this._options.upVector[2] - deltaX / 100 * rightVector[2])*cameraDistance*0.1];
+            this._options.cameraLocation[0] += translation[0];
+            this._options.cameraLocation[1] += translation[1];
+            this._options.cameraLocation[2] += translation[2];
+            this._options.centerLocation[0] += translation[0];
+            this._options.centerLocation[1] += translation[1];
+            this._options.centerLocation[2] += translation[2];
+        } else {
+            var l = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            if (l > 0) {
+                var axis = [
+                    deltaX / l * this._options.upVector[0] + deltaY / l * rightVector[0],
+                    deltaX / l * this._options.upVector[1] + deltaY / l * rightVector[1],
+                    deltaX / l * this._options.upVector[2] + deltaY / l * rightVector[2]];
+                var rotationMatrix = WebGLSpins._rotationMatrix(axis, -0.1 * l);
+                forwardVector = WebGLSpins._matrixMultiply(rotationMatrix, forwardVector);
+                this._options.upVector = WebGLSpins._matrixMultiply(rotationMatrix, this._options.upVector);
+                this._options.cameraLocation[0] = this._options.centerLocation[0] - cameraDistance * forwardVector[0];
+                this._options.cameraLocation[1] = this._options.centerLocation[1] - cameraDistance * forwardVector[1];
+                this._options.cameraLocation[2] = this._options.centerLocation[2] - cameraDistance * forwardVector[2];
+            }
+        }
+    }
+    this._lastMouseX = newX;
+    this._lastMouseY = newY;
+    this.draw();
+};
+
+WebGLSpins.prototype._handleMouseScroll = function(event) {
+    if (!this._options.allowCameraMovement) {
+        return;
+    }
+    var delta = Math.max(-1, Math.min(1, (event.wheelDelta || -event.detail)));
+    this.zoom(delta);
+};
+
+WebGLSpins.prototype.zoom = function(delta) {
+    if (!this._options.allowCameraMovement) {
+        return;
+    }
+    var forwardVector = WebGLSpins._difference(this._options.centerLocation, this._options.cameraLocation);
+    var cameraDistance = WebGLSpins._length(forwardVector);
+    if (cameraDistance < 2 && delta < 1) {
+        return;
+    }
+    this._options.cameraLocation[0] = this._options.centerLocation[0] - (1+0.02*delta) * forwardVector[0];
+    this._options.cameraLocation[1] = this._options.centerLocation[1] - (1+0.02*delta) * forwardVector[1];
+    this._options.cameraLocation[2] = this._options.centerLocation[2] - (1+0.02*delta) * forwardVector[2];
+    this.draw();
+}
+
+
+// ----------------------- Linear Algebra Utilities ---------------------------
+
+WebGLSpins._difference = function(a, b) {
+    return [
+        a[0]-b[0],
+        a[1]-b[1],
+        a[2]-b[2]
+    ];
+};
+
+WebGLSpins._length = function(a) {
+    return Math.sqrt(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]);
+};
+
+WebGLSpins._normalize = function(a) {
+    var length = WebGLSpins._length(a);
+    return [a[0]/length, a[1]/length, a[2]/length];
+};
+
+WebGLSpins._cross = function(a, b) {
+    return [
+        a[1]*b[2]-a[2]*b[1],
+        a[2]*b[0]-a[0]*b[2],
+        a[0]*b[1]-a[1]*b[0]
+    ];
+};
+
+WebGLSpins._rotationMatrix = function(axis, angle) {
+    var c = Math.cos(Math.PI * angle / 180);
+    var s = Math.sin(Math.PI * angle / 180);
+    var x = axis[0];
+    var y = axis[1];
+    var z = axis[2];
+    return [
+        [x*x*(1-c)+c, x*y*(1-c)-z*s, x*z*(1-c)+y*s, 0],
+        [x*y*(1-c)+z*s, y*y*(1-c)+c, z*y*(1-c)-x*s, 0],
+        [x*z*(1-c)-y*s, z*y*(1-c)+x*s, z*z*(1-c)+c,0],
+        [0, 0, 0, 1]
+    ];
+};
+
+WebGLSpins._matrixMultiply = function(matrix, vector) {
+    var result = [0, 0, 0];
+    for(var i = 0; i < 3; i++) {
+        for(var j = 0; j < 3; j++) {
+            result[i] += matrix[i][j]*vector[j];
+        }
+        result[i] += matrix[i][3];
+    }
+    return result;
+};
+
+WebGLSpins._perspectiveProjectionMatrix = function(verticalFieldOfView, aspectRatio, zNear, zFar) {
+    var f = 1.0/Math.tan(verticalFieldOfView/2);
+    return [
+        [f/aspectRatio, 0, 0, 0],
+        [0, f, 0, 0],
+        [0, 0, (zNear+zFar)/(zNear-zFar), 2*zFar*zNear/(zNear-zFar)],
+        [0, 0, -1, 0]
+    ]
+};
+
+WebGLSpins._lookAtMatrix = function(cameraLocation, centerLocation, upVector) {
+    var forwardVector = WebGLSpins._difference(centerLocation, cameraLocation);
+    forwardVector = WebGLSpins._normalize(forwardVector);
+    upVector = WebGLSpins._normalize(upVector);
+    var rightVector = WebGLSpins._cross(forwardVector, upVector);
+    rightVector = WebGLSpins._normalize(rightVector);
+    upVector = WebGLSpins._cross(rightVector, forwardVector);
+    var matrix = [
+        [rightVector[0], rightVector[1], rightVector[2], 0],
+        [upVector[0], upVector[1], upVector[2], 0],
+        [-forwardVector[0], -forwardVector[1], -forwardVector[2], 0],
+        [0, 0, 0, 1]
+    ];
+    var translationVector = WebGLSpins._matrixMultiply(matrix, cameraLocation);
+    matrix[0][3] = -translationVector[0];
+    matrix[1][3] = -translationVector[1];
+    matrix[2][3] = -translationVector[2];
+    return matrix;
+};
+
+WebGLSpins._toFloat32Array = function(matrix) {
+    return new Float32Array([
+        matrix[0][0], matrix[1][0], matrix[2][0], matrix[3][0],
+        matrix[0][1], matrix[1][1], matrix[2][1], matrix[3][1],
+        matrix[0][2], matrix[1][2], matrix[2][2], matrix[3][2],
+        matrix[0][3], matrix[1][3], matrix[2][3], matrix[3][3]
+    ]);
+};
+
+// ---------------------------- Arrow Renderer --------------------------------
+
+WebGLSpins._ArrowRenderer = function(webglspins) {
+    this._webglspins = webglspins;
+    this._options = webglspins._options;
+    this._program = null;
+    this._vbo = null;
+    this._ibo = null;
+    this._instancePositionVbo = 0;
+    this._instanceDirectionVbo = 0;
+    this._numIndices = 0;
+    this._numInstances = 0;
+
+    if (webglspins._gl_initialized) {
+        this.initGLContext();
+    }
+    if (webglspins._instancePositionArray != null && webglspins._instanceDirectionArray != null) {
+        this.updateSpins(webglspins._instancePositionArray, webglspins._instanceDirectionArray)
+    }
+};
+
+WebGLSpins.renderModes.ARROWS = WebGLSpins._ArrowRenderer;
+
+WebGLSpins.defaultOptions.coneHeight = 0.6;
+WebGLSpins.defaultOptions.coneRadius = 0.25;
+WebGLSpins.defaultOptions.cylinderHeight = 0.7;
+WebGLSpins.defaultOptions.cylinderRadius = 0.125;
+WebGLSpins.defaultOptions.levelOfDetail = 20;
+WebGLSpins.defaultOptions.renderMode = WebGLSpins.renderModes.ARROWS;
+
+
+WebGLSpins._ArrowRenderer.prototype.optionsHaveChanged = function(changedOptions) {
+    var arrayContainsAny = function (array, values) {
+        for (var i = 0; i < values.length; i++) {
+            if (~array.indexOf(values[i])) {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (arrayContainsAny(changedOptions, ['coneHeight', 'coneRadius', 'cylinderHeight', 'cylinderRadius'])) {
+        this._updateVertexData();
+    }
+    if (arrayContainsAny(changedOptions, ['colormapImplementation'])) {
+        this._updateShaderProgram();
+    }
+};
+
+WebGLSpins._ArrowRenderer.prototype.updateSpins = function(instancePositionArray, instanceDirectionArray) {
+    var gl = this._webglspins._gl;
+    this._numInstances = instancePositionArray.length/3;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._instancePositionVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, instancePositionArray, gl.STREAM_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._instanceDirectionVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, instanceDirectionArray, gl.STREAM_DRAW);
+};
+
+WebGLSpins._ArrowRenderer.prototype.draw = function() {
+    var gl = this._webglspins._gl;
+    if (this._numInstances <= 0) {
+        return;
+    }
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._vbo);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 4*3*2, 0);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 4*3*2, 4*3);
+    gl.enableVertexAttribArray(1);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._instancePositionVbo);
+    gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribDivisor(2, 1);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._instanceDirectionVbo);
+    gl.vertexAttribPointer(3, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribDivisor(3, 1);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._ibo);
+
+    gl.useProgram(this._program);
+
+    var width = this._webglspins._canvas.clientWidth;
+    var height = this._webglspins._canvas.clientHeight;
+    var projectionMatrix = WebGLSpins._perspectiveProjectionMatrix(this._options.verticalFieldOfView, width / height, 0.1, 10000);
+    gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uProjectionMatrix"), false, WebGLSpins._toFloat32Array(projectionMatrix));
+    var modelviewMatrix = WebGLSpins._lookAtMatrix(this._options.cameraLocation, this._options.centerLocation, this._options.upVector);
+    gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uModelviewMatrix"), false, WebGLSpins._toFloat32Array(modelviewMatrix));
+    var lightPosition = WebGLSpins._matrixMultiply(modelviewMatrix, this._options.cameraLocation);
+    gl.uniform3f(gl.getUniformLocation(this._program, "uLightPosition"), lightPosition[0], lightPosition[1], lightPosition[2]);
+
+    gl.drawElementsInstanced(gl.TRIANGLES, this._numIndices, gl.UNSIGNED_SHORT, null, this._numInstances);
+};
+
+WebGLSpins._ArrowRenderer.prototype.initGLContext = function() {
+    var gl = this._webglspins._gl;
     // Add extensions functions and constants to the context:
     var angle_instanced_arrays_ext = gl.getExtension("ANGLE_instanced_arrays");
     if (!angle_instanced_arrays_ext) {
@@ -212,12 +465,10 @@ WebGLSpins.prototype._initGLContext = function() {
 
     this._updateShaderProgram();
     this._updateVertexData();
-
-    this._gl_initialized = true;
 };
 
-WebGLSpins.prototype._updateShaderProgram = function() {
-    var gl = this._gl;
+WebGLSpins._ArrowRenderer.prototype._updateShaderProgram = function() {
+    var gl = this._webglspins._gl;
     if (this._program) {
         gl.deleteProgram(this._program);
     }
@@ -258,7 +509,7 @@ WebGLSpins.prototype._updateShaderProgram = function() {
         vec3 colormap(vec3 direction);
         
         void main(void) {
-          vfColor = colormap(ivInstanceDirection);
+          vfColor = colormap(normalize(ivInstanceDirection));
           mat3 instanceMatrix = matrixFromDirection(ivInstanceDirection);
           vfNormal = (uModelviewMatrix * vec4(instanceMatrix*ivNormal, 0.0)).xyz;
           vfPosition = (uModelviewMatrix * vec4(instanceMatrix*ivPosition+ivInstanceOffset, 1.0)).xyz;
@@ -314,11 +565,11 @@ WebGLSpins.prototype._updateShaderProgram = function() {
         return;
     }
     this._program = program;
-}
+};
 
-WebGLSpins.prototype._updateVertexData = function() {
-    var gl = this._gl;
-    
+WebGLSpins._ArrowRenderer.prototype._updateVertexData = function() {
+    var gl = this._webglspins._gl;
+
     var levelOfDetail = this._options.levelOfDetail;
     var coneHeight = this._options.coneHeight;
     var coneRadius = this._options.coneRadius;
@@ -414,180 +665,223 @@ WebGLSpins.prototype._updateVertexData = function() {
     this._numIndices = indices.length;
 };
 
-WebGLSpins.prototype._handleMouseDown = function(event) {
-    if (!this._options.allowCameraMovement) {
-        return;
-    }
-    this._mouseDown = true;
-    this._lastMouseX = event.clientX;
-    this._lastMouseY = event.clientY;
+WebGLSpins._ArrowRenderer.prototype.cleanup = function() {
+    var gl = this._webglspins._gl;
+    gl.deleteBuffer(this._vbo);
+    gl.deleteBuffer(this._ibo);
+    gl.deleteBuffer(this._instancePositionVbo);
+    gl.deleteBuffer(this._instanceDirectionVbo);
+    gl.deleteProgram(this._program);
+    gl.disableVertexAttribArray(0);
+    gl.disableVertexAttribArray(1);
+    gl.disableVertexAttribArray(2);
+    gl.disableVertexAttribArray(3);
 };
 
-WebGLSpins.prototype._handleMouseUp = function(event) {
-    this._mouseDown = false;
+// --------------------------- Surface Renderer -------------------------------
+
+WebGLSpins._SurfaceRenderer = function(webglspins) {
+    this._webglspins = webglspins;
+    this._options = webglspins._options;
+    this._program = null;
+    this._ibo = null;
+    this._instancePositionVbo = 0;
+    this._instanceDirectionVbo = 0;
+    this._numIndices = 0;
+    if (webglspins._gl_initialized) {
+        this.initGLContext();
+    }
+    if (webglspins._instancePositionArray != null && webglspins._instanceDirectionArray != null) {
+        this.updateSpins(webglspins._instancePositionArray, webglspins._instanceDirectionArray)
+    }
 };
 
-WebGLSpins.prototype._handleMouseMove = function(event) {
-    if (!this._options.allowCameraMovement) {
-        return;
-    }
-    if (!this._mouseDown) {
-      return;
-    }
-    var newX = event.clientX;
-    var newY = event.clientY;
-    var deltaX = newX - this._lastMouseX;
-    var deltaY = newY - this._lastMouseY;
-    if (event.shiftKey) {
-        this.zoom(deltaY > 0 ? 1 : -1);
-    } else {
-        var forwardVector = WebGLSpins._difference(this._options.centerLocation, this._options.cameraLocation);
-        var cameraDistance = WebGLSpins._length(forwardVector);
-        forwardVector = WebGLSpins._normalize(forwardVector);
-        this._options.upVector = WebGLSpins._normalize(this._options.upVector);
-        var rightVector = WebGLSpins._cross(forwardVector, this._options.upVector);
-        this._options.upVector = WebGLSpins._cross(rightVector, forwardVector);
-        this._options.upVector = WebGLSpins._normalize(this._options.upVector);
-        if (event.altKey) {
-            var translation =  [
-                    deltaY / 100 * this._options.upVector[0] - deltaX / 100 * rightVector[0],
-                    deltaY / 100 * this._options.upVector[1] - deltaX / 100 * rightVector[1],
-                    deltaY / 100 * this._options.upVector[2] - deltaX / 100 * rightVector[2]];
-            this._options.cameraLocation[0] += translation[0];
-            this._options.cameraLocation[1] += translation[1];
-            this._options.cameraLocation[2] += translation[2];
-            this._options.centerLocation[0] += translation[0];
-            this._options.centerLocation[1] += translation[1];
-            this._options.centerLocation[2] += translation[2];
-        } else {
-            var l = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            if (l > 0) {
-                var axis = [
-                    deltaX / l * this._options.upVector[0] + deltaY / l * rightVector[0],
-                    deltaX / l * this._options.upVector[1] + deltaY / l * rightVector[1],
-                    deltaX / l * this._options.upVector[2] + deltaY / l * rightVector[2]];
-                var rotationMatrix = WebGLSpins._rotationMatrix(axis, -0.1 * l);
-                forwardVector = WebGLSpins._matrixMultiply(rotationMatrix, forwardVector);
-                this._options.upVector = WebGLSpins._matrixMultiply(rotationMatrix, this._options.upVector);
-                this._options.cameraLocation[0] = this._options.centerLocation[0] - cameraDistance * forwardVector[0];
-                this._options.cameraLocation[1] = this._options.centerLocation[1] - cameraDistance * forwardVector[1];
-                this._options.cameraLocation[2] = this._options.centerLocation[2] - cameraDistance * forwardVector[2];
+WebGLSpins.renderModes.SURFACE = WebGLSpins._SurfaceRenderer;
+
+WebGLSpins.defaultOptions.surfaceIndices = [];
+
+WebGLSpins._SurfaceRenderer.prototype.optionsHaveChanged = function(changedOptions) {
+    var arrayContainsAny = function (array, values) {
+        for (var i = 0; i < values.length; i++) {
+            if (~array.indexOf(values[i])) {
+                return true;
             }
         }
+        return false;
+    };
+    if (arrayContainsAny(changedOptions, ['surfaceIndices'])) {
+        this._updateSurfaceIndices();
     }
-    this._lastMouseX = newX;
-    this._lastMouseY = newY;
-    this.draw();
+    if (arrayContainsAny(changedOptions, ['colormapImplementation'])) {
+        this._updateShaderProgram();
+    }
 };
 
-WebGLSpins.prototype._handleMouseScroll = function(event) {
-    if (!this._options.allowCameraMovement) {
+WebGLSpins._SurfaceRenderer.prototype.updateSpins = function(instancePositionArray, instanceDirectionArray) {
+    var gl = this._webglspins._gl;
+    this._numInstances = instancePositionArray.length/3;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._instancePositionVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, instancePositionArray, gl.STREAM_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._instanceDirectionVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, instanceDirectionArray, gl.STREAM_DRAW);
+};
+
+WebGLSpins._SurfaceRenderer.prototype.draw = function() {
+    var gl = this._webglspins._gl;
+    if (this._numIndices < 3) {
         return;
     }
-    var delta = Math.max(-1, Math.min(1, (event.wheelDelta || -event.detail)));
-    this.zoom(delta);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._instancePositionVbo);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._instanceDirectionVbo);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(1);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._ibo);
+
+    gl.useProgram(this._program);
+
+    var width = this._webglspins._canvas.clientWidth;
+    var height = this._webglspins._canvas.clientHeight;
+    var projectionMatrix = WebGLSpins._perspectiveProjectionMatrix(this._options.verticalFieldOfView, width / height, 0.1, 10000);
+    gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uProjectionMatrix"), false, WebGLSpins._toFloat32Array(projectionMatrix));
+    var modelviewMatrix = WebGLSpins._lookAtMatrix(this._options.cameraLocation, this._options.centerLocation, this._options.upVector);
+    gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uModelviewMatrix"), false, WebGLSpins._toFloat32Array(modelviewMatrix));
+
+    gl.disable(gl.CULL_FACE);
+    gl.drawElements(gl.TRIANGLES, this._numIndices, gl.UNSIGNED_INT, null);
+    gl.enable(gl.CULL_FACE);
 };
 
-WebGLSpins.prototype.zoom = function(delta) {
-    if (!this._options.allowCameraMovement) {
+WebGLSpins._SurfaceRenderer.prototype.initGLContext = function() {
+    var gl = this._webglspins._gl;
+    // Add extensions functions and constants to the context:
+    var oes_element_index_uint_ext = gl.getExtension("OES_element_index_uint");
+    if (!oes_element_index_uint_ext) {
+        console.error('WebGL does not support OES_element_index_uint required by WebGLSpins');
         return;
     }
-    var forwardVector = WebGLSpins._difference(this._options.centerLocation, this._options.cameraLocation);
-    var cameraDistance = WebGLSpins._length(forwardVector);
-    if (cameraDistance < 2 && delta < 1) {
-        return;
+
+    this._ibo = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._ibo);
+    this._numIndices = 0;
+
+    this._instancePositionVbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._instancePositionVbo);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
+
+    this._instanceDirectionVbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._instanceDirectionVbo);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(1);
+
+    this._updateShaderProgram();
+    this._updateSurfaceIndices();
+};
+
+WebGLSpins._SurfaceRenderer.prototype._updateShaderProgram = function() {
+    var gl = this._webglspins._gl;
+    if (this._program) {
+        gl.deleteProgram(this._program);
     }
-    this._options.cameraLocation[0] = this._options.centerLocation[0] - (1+0.02*delta) * forwardVector[0];
-    this._options.cameraLocation[1] = this._options.centerLocation[1] - (1+0.02*delta) * forwardVector[1];
-    this._options.cameraLocation[2] = this._options.centerLocation[2] - (1+0.02*delta) * forwardVector[2];
-    this.draw();
-}
 
-WebGLSpins._difference = function(a, b) {
-    return [
-        a[0]-b[0],
-        a[1]-b[1],
-        a[2]-b[2]
-    ];
-};
-
-WebGLSpins._length = function(a) {
-    return Math.sqrt(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]);
-};
-
-WebGLSpins._normalize = function(a) {
-    var length = WebGLSpins._length(a);
-    return [a[0]/length, a[1]/length, a[2]/length];
-};
-
-WebGLSpins._cross = function(a, b) {
-    return [
-        a[1]*b[2]-a[2]*b[1],
-        a[2]*b[0]-a[0]*b[2],
-        a[0]*b[1]-a[1]*b[0]
-    ];
-};
-
-WebGLSpins._rotationMatrix = function(axis, angle) {
-    var c = Math.cos(Math.PI * angle / 180);
-    var s = Math.sin(Math.PI * angle / 180);
-    var x = axis[0];
-    var y = axis[1];
-    var z = axis[2];
-    return [
-        [x*x*(1-c)+c, x*y*(1-c)-z*s, x*z*(1-c)+y*s, 0],
-        [x*y*(1-c)+z*s, y*y*(1-c)+c, z*y*(1-c)-x*s, 0],
-        [x*z*(1-c)-y*s, z*y*(1-c)+x*s, z*z*(1-c)+c,0],
-        [0, 0, 0, 1]
-    ];
-};
-
-WebGLSpins._matrixMultiply = function(matrix, vector) {
-    var result = [0, 0, 0];
-    for(var i = 0; i < 3; i++) {
-        for(var j = 0; j < 3; j++) {
-            result[i] += matrix[i][j]*vector[j];
+    var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vertexShader, `
+        #version 100
+        precision highp float;
+        
+        uniform mat4 uProjectionMatrix;
+        uniform mat4 uModelviewMatrix;
+        attribute vec3 ivPosition;
+        attribute vec3 ivDirection;
+        varying vec3 vfDirection;
+        
+        void main(void) {
+          vfDirection = normalize(ivDirection);
+          gl_Position = uProjectionMatrix * (uModelviewMatrix * vec4(ivPosition, 1.0));
         }
-        result[i] += matrix[i][3];
+    `);
+    gl.compileShader(vertexShader);
+    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+        console.error("vertex shader info log:\n" + gl.getShaderInfoLog(vertexShader));
+        return;
     }
-    return result;
+
+    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fragmentShader, `
+        #version 100
+        precision highp float;
+        
+        varying vec3 vfDirection;
+        
+        vec3 colormap(vec3 direction);
+        
+        void main(void) {
+          vec3 color = colormap(normalize(vfDirection));
+          gl_FragColor = vec4(color, 1.0);
+        }
+    `+this._options.colormapImplementation);
+    gl.compileShader(fragmentShader);
+    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+        console.error("fragment shader info log:\n" + gl.getShaderInfoLog(fragmentShader));
+        return;
+    }
+
+    var program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.bindAttribLocation(program, 0, 'ivPosition');
+    gl.bindAttribLocation(program, 1, 'ivDirection');
+    gl.linkProgram(program);
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error("program info log:\n" + gl.getProgramInfoLog(program));
+        return;
+    }
+    this._program = program;
 };
 
-WebGLSpins._perspectiveProjectionMatrix = function(verticalFieldOfView, aspectRatio, zNear, zFar) {
-    var f = 1.0/Math.tan(verticalFieldOfView/2);
-    return [
-        [f/aspectRatio, 0, 0, 0],
-        [0, f, 0, 0],
-        [0, 0, (zNear+zFar)/(zNear-zFar), 2*zFar*zNear/(zNear-zFar)],
-        [0, 0, -1, 0]
-    ]
+WebGLSpins._SurfaceRenderer.prototype._updateSurfaceIndices = function() {
+    var gl = this._webglspins._gl;
+
+    var surfaceIndices = this._options.surfaceIndices;
+
+    // Enforce valid range
+    if (surfaceIndices.length < 3) {
+        this._numIndices = 0;
+        return;
+    }
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._ibo);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Int32Array(surfaceIndices), gl.STATIC_DRAW);
+    this._numIndices = surfaceIndices.length;
 };
 
-WebGLSpins._lookAtMatrix = function(cameraLocation, centerLocation, upVector) {
-    var forwardVector = WebGLSpins._difference(centerLocation, cameraLocation);
-    forwardVector = WebGLSpins._normalize(forwardVector);
-    upVector = WebGLSpins._normalize(upVector);
-    var rightVector = WebGLSpins._cross(forwardVector, upVector);
-    rightVector = WebGLSpins._normalize(rightVector);
-    upVector = WebGLSpins._cross(rightVector, forwardVector);
-    var matrix = [
-        [rightVector[0], rightVector[1], rightVector[2], 0],
-        [upVector[0], upVector[1], upVector[2], 0],
-        [-forwardVector[0], -forwardVector[1], -forwardVector[2], 0],
-        [0, 0, 0, 1]
-    ];
-    var translationVector = WebGLSpins._matrixMultiply(matrix, cameraLocation);
-    matrix[0][3] = -translationVector[0];
-    matrix[1][3] = -translationVector[1];
-    matrix[2][3] = -translationVector[2];
-    return matrix;
+WebGLSpins._SurfaceRenderer.prototype.cleanup = function() {
+    var gl = this._webglspins._gl;
+    gl.deleteBuffer(this._instancePositionVbo);
+    gl.deleteBuffer(this._instanceDirectionVbo);
+    gl.deleteBuffer(this._ibo);
+    gl.deleteProgram(this._program);
+    gl.disableVertexAttribArray(0);
+    gl.disableVertexAttribArray(1);
 };
 
-WebGLSpins._toFloat32Array = function(matrix) {
-    return new Float32Array([
-        matrix[0][0], matrix[1][0], matrix[2][0], matrix[3][0],
-        matrix[0][1], matrix[1][1], matrix[2][1], matrix[3][1],
-        matrix[0][2], matrix[1][2], matrix[2][2], matrix[3][2],
-        matrix[0][3], matrix[1][3], matrix[2][3], matrix[3][3]
-    ]);
+WebGLSpins.generateCartesianSurfaceIndices = function(nx, ny) {
+    var surfaceIndices = [];
+    for (var i = 0; i < ny-1; i++) {
+        for (var j = 0; j < nx-1; j++) {
+            var square_indices = [
+                i*nx + j, i*nx + j + 1, (i+1)*nx + j,
+                (i+1)*nx + j, i*nx + j + 1, (i+1)*nx + j + 1
+            ];
+            Array.prototype.push.apply(surfaceIndices, square_indices);
+        }
+    }
+    return surfaceIndices;
 };

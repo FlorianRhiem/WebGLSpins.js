@@ -38,18 +38,30 @@
         <option value="redblue">Red-Blue</option>
         <option value="hue">Hue</option>
       </select>
+      <label for="select-rendermode">Rendermode</label>
+      <select id="select-rendermode">
+        <option value="ARROWS">Arrows</option>
+        <option value="SURFACE">Surface</option>
+      </select>
     </div>
     <script
         src="https://code.jquery.com/jquery-2.2.4.min.js"
         integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44="
         crossorigin="anonymous"></script>
-    <script src="../webglspins.min.js"></script>
+    <script src="../webglspins.js"></script>
     <script type='text/javascript'>
 
       function updateColormap() {
         var colormap = $("option:selected", $('#select-colormap'))[0].value;
         webglspins.updateOptions({
           colormapImplementation: WebGLSpins.colormapImplementations[colormap]
+        });
+      }
+
+      function updateRenderMode() {
+        var renderMode = $("option:selected", $('#select-rendermode'))[0].value;
+        webglspins.updateOptions({
+          renderMode: WebGLSpins.renderModes[renderMode]
         });
       }
 
@@ -60,11 +72,16 @@
           upVector: [0, 0, 1]
         });
         updateColormap();
+        updateRenderMode();
         simulate();
       });
 
       $('#select-colormap').on('change', function (e) {
         updateColormap();
+      });
+
+      $('#select-rendermode').on('change', function (e) {
+        updateRenderMode();
       });
 
       var iteration = 0;
@@ -81,7 +98,11 @@
           var spinDirection = [0, Math.cos((row+iteration)*0.05), Math.sin((row+iteration)*0.05)];
           Array.prototype.push.apply(spinDirections, spinDirection);
         }
-        webglspins.updateSpins(n, spinPositions, spinDirections);
+        webglspins.updateSpins(spinPositions, spinDirections);
+        var NX = 10;
+        var NY = 500;
+        var surfaceIndices = WebGLSpins.generateCartesianSurfaceIndices(NX, NY);
+        webglspins.updateOptions({surfaceIndices: surfaceIndices});
         window.requestAnimationFrame(simulate);
       }
     </script>
