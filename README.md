@@ -8,7 +8,7 @@ Just [download the minified JavaScript file](https://raw.githubusercontent.com/F
 git clone https://github.com/FlorianRhiem/WebGLSpins.js.git
 ```
 
-WebGLSpins.js has no dependencies to other JavaScript files, but it requires browser support of [WebGL 1.0](https://www.khronos.org/webgl/) and the [ANGLE_instanced_arrays](http://www.khronos.org/registry/webgl/extensions/ANGLE_instanced_arrays/) extension.
+WebGLSpins.js has no dependencies to other JavaScript files, but it requires browser support of [WebGL 1.0](https://www.khronos.org/webgl/) and the [ANGLE_instanced_arrays](http://www.khronos.org/registry/webgl/extensions/ANGLE_instanced_arrays/) and [OES_element_index_uint](http://www.khronos.org/registry/webgl/extensions/OES_element_index_uint/) extensions.
 
 ## Usage Examples
 
@@ -18,8 +18,8 @@ A [static, minimal example](https://florianrhiem.github.io/WebGLSpins.js/example
 <canvas id="webgl-canvas" width="800" height="800"></canvas>
 <script src="webglspins.js"></script>
 <script type='text/javascript'>
-var webglspins = new WebGLSpins(document.getElementById('webgl-canvas'));
-webglspins.updateSpins(1, [0, 0, 0], [1, 0, 0]);
+  var webglspins = new WebGLSpins(document.getElementById('webgl-canvas'));
+  webglspins.updateSpins(1, [0, 0, 0], [1, 0, 0]);
 </script>
 ```
 
@@ -41,7 +41,7 @@ var webglspins = WebGLSpins(<HTMLCanvasElement> canvas, <options> options?);
 | upVector | Array | [0.0, 1.0, 0.0] | Direction that should be up. |
 | backgroundColor | Array | [0.0, 0.0, 0.0] | Color of the background. |
 | colormapImplementation | String | red&nbsp;(see&nbsp;below) | GLSL code for mapping spin direction to a color. |
-| renderMode | Function | Arrows&nbsp;(see&nbsp;below) | Render mode. |
+| renderers | Array | [Arrows]&nbsp;(see&nbsp;below) | Array of renderers to use and (optionally) their viewports. |
 | zRange | Array | [-1, 1] | The range of visible z values. Spins with a direction z component outside this range will not be rendered. |
 
 Arrow render mode options:
@@ -75,22 +75,40 @@ If you use a cartesian grid, you can generate the `surfaceIndices` for the surfa
 WebGLSpins.generateCartesianSurfaceIndices(<Number> nx, <Number> ny);
 ```
 
-### Render modes
+### Renderers
+
+By default, spins are rendered as arrows using the full size of the canvas. However, WebGLSpins.js allows you to use multiple renderers, even at the same time. By setting the `renderers` option, you can specify an array of renders and (optionally) their viewports, e.g.:
+```js
+webglspins.updateOptions({
+  renderers: [
+    WebGLSpins.renderers.ARROWS,
+    [WebGLSpins.renderers.SPHERE, [0.0, 0.0, 0.2, 0.2]
+  ]
+});
+```
 
 #### Arrows
 
-Spins are rendered as arrows. To use this render mode, set the `renderMode` option to `WebGLSpins.renderModes.ARROWS`.
+Spins are rendered as arrows. This renderer is available as `WebGLSpins.renderModes.ARROWS`.
 
 #### Surface
 
 Spins are rendered as surface. To define the surface, WebGLSpins needs to know which points should be connected as triangles. To do this, set the `surfaceIndices` option to an array of indices into the spin position array. For example, if you only have three spins and want to render them as a triangle, use:
 ```js
 webglspins.updateOptions({
-surfaceIndices: [0, 1, 2]
+  surfaceIndices: [0, 1, 2]
 });
 ```
 
-To use this render mode, set the `renderMode` option to `WebGLSpins.renderModes.SURFACE`.
+This renderer is available as `WebGLSpins.renderModes.SURFACE`.
+
+#### Sphere
+
+Spins are rendered as points on a sphere, with their position on the sphere defined by the spin direction. Camera zoom and translation are disabled in this renderer. This renderer is available as `WebGLSpins.renderModes.SPHERE`.
+
+#### Coordinate System
+
+Spins are not rendered. Instead, a coordinate system is rendered as lines, using the current colormap to color the axes. Camera zoom and translation are disabled in this renderer. This renderer is available as `WebGLSpins.renderModes.COORDINATESYSTEM`.
 
 ### Colormap implementations
 
@@ -99,7 +117,7 @@ There are three colormaps already available, basically as templates for your own
 #### Colormap 'red'
 ```glsl
 vec3 colormap(vec3 direction) {
-return vec3(1.0, 0.0, 0.0);
+  return vec3(1.0, 0.0, 0.0);
 }
 ```
 
@@ -107,9 +125,9 @@ return vec3(1.0, 0.0, 0.0);
 A transition from red for positive z to blue for negative z direction.
 ```glsl
 vec3 colormap(vec3 direction) {
-vec3 color_down = vec3(0.0, 0.0, 1.0);
-vec3 color_up = vec3(1.0, 0.0, 0.0);
-return mix(color_down, color_up, direction.z*0.5+0.5);
+  vec3 color_down = vec3(0.0, 0.0, 1.0);
+  vec3 color_up = vec3(1.0, 0.0, 0.0);
+  return mix(color_down, color_up, direction.z*0.5+0.5);
 }
 ```
 
@@ -117,16 +135,16 @@ return mix(color_down, color_up, direction.z*0.5+0.5);
 The angle between z and y is mapped to a hue value between 0 and 1, with a positive z direction resulting in red.
 ```glsl
 float atan2(float y, float x) {
-return x == 0.0 ? sign(y)*3.14159/2.0 : atan(y, x);
+  return x == 0.0 ? sign(y)*3.14159/2.0 : atan(y, x);
 }
 vec3 hsv2rgb(vec3 c) {
-vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+  vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 vec3 colormap(vec3 direction) {
-vec2 xy = normalize(direction.yz);
-float hue = atan2(xy.x, xy.y) / 3.14159 / 2.0;
-return hsv2rgb(vec3(hue, 1.0, 1.0));
+  vec2 xy = normalize(direction.yz);
+  float hue = atan2(xy.x, xy.y) / 3.14159 / 2.0;
+  return hsv2rgb(vec3(hue, 1.0, 1.0));
 }
 ```
