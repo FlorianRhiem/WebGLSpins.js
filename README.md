@@ -44,7 +44,7 @@ var webglspins = WebGLSpins(<HTMLCanvasElement> canvas, <options> options?);
 | renderers | Array | [Arrows]&nbsp;(see&nbsp;below) | Array of renderers to use and (optionally) their viewports. |
 | zRange | Array | [-1, 1] | The range of visible z values. Spins with a direction z component outside this range will not be rendered. |
 
-Arrow render mode options:
+Arrow renderer options:
 
 | Options | Type | Default | Description |
 |---|:-:|:-:|---|
@@ -54,11 +54,17 @@ Arrow render mode options:
 | cylinderRadius | Number | 0.125 | Radius of the spin cylinder/arrow shaft. |
 | levelOfDetail | Number | 20 | Number of sides for the spin arrow mesh. Must be at least three. |
 
-Surface render mode options:
+Surface renderer options:
 
 | Options | Type | Default | Description |
 |---|:-:|:-:|---|
 | surfaceIndices | Array | [] | Array of indices for rendering a surface. |
+
+Sphere renderer options:
+
+| Options | Type | Default | Description |
+|---|:-:|:-:|---|
+| pointSize | Number | 1 | Size of each individual point. |
 
 To change these options later on, use:
 ```js
