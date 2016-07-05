@@ -60,8 +60,17 @@
 
       function updateRenderMode() {
         var renderMode = $("option:selected", $('#select-rendermode'))[0].value;
+        var renderers = [WebGLSpins.renderers[renderMode]];
+        var showCoordinateSystemWidget = true;
+        if (showCoordinateSystemWidget) {
+          renderers.push([WebGLSpins.renderers.COORDINATESYSTEM, [0, 0, 0.2, 0.2]]);
+        }
+        var showSphereWidget = true;
+        if (showSphereWidget) {
+          renderers.push([WebGLSpins.renderers.SPHERE, [0, 0, 0.2, 0.2]]);
+        }
         webglspins.updateOptions({
-          renderMode: WebGLSpins.renderModes[renderMode]
+          renderers: renderers
         });
       }
 
@@ -95,7 +104,10 @@
           var column = i % 10;
           var spinPosition = [2 * column, 2 * row, 0];
           Array.prototype.push.apply(spinPositions, spinPosition);
-          var spinDirection = [0, Math.cos((row+iteration)*0.05), Math.sin((row+iteration)*0.05)];
+          var spinDirection = [
+            Math.sin(column*0.3)*Math.cos((row+iteration)*0.05),
+            Math.cos(column*0.3)*Math.cos((row+iteration)*0.05),
+            Math.sin((row+iteration)*0.05)];
           Array.prototype.push.apply(spinDirections, spinDirection);
         }
         webglspins.updateSpins(spinPositions, spinDirections);
