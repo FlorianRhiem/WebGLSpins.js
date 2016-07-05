@@ -6,7 +6,16 @@ function WebGLSpins(canvas, options) {
     this._mergeOptions(options, WebGLSpins.defaultOptions);
     this._gl = null;
     this._gl_initialized = false;
-    this._renderer = new this._options.renderMode(this);
+    this._renderers = [];
+    for (var i = 0; i < this._options.renderers.length; i++) {
+        var renderer = this._options.renderers[i];
+        var viewport = [0, 0, 1, 1];
+        if (typeof renderer === typeof []) {
+            viewport = renderer[1];
+            renderer = renderer[0];
+        }
+        this._renderers.push([new renderer(this), viewport]);
+    }
     this._initGLContext();
     this._instancePositionArray = null;
     this._instanceDirectionArray = null;
@@ -48,7 +57,7 @@ WebGLSpins.colormapImplementations = {
         }`
 };
 
-WebGLSpins.renderModes = {};
+WebGLSpins.renderers = {};
 
 WebGLSpins.defaultOptions = {};
 WebGLSpins.defaultOptions.verticalFieldOfView = 45;
@@ -75,11 +84,24 @@ WebGLSpins.prototype.updateOptions = function(options) {
     if (changedOptions.length == 0) {
         return;
     }
-    if (changedOptions.indexOf('renderMode') != -1) {
-        this._renderer.cleanup();
-        this._renderer = new this._options.renderMode(this);
+    if (changedOptions.indexOf('renderers') != -1) {
+        for (var i = 0; i < this._renderers.length; i++) {
+            this._renderers[i][0].cleanup();
+        }
+        this._renderers = [];
+        for (var i = 0; i < this._options.renderers.length; i++) {
+            var renderer = this._options.renderers[i];
+            var viewport = [0, 0, 1, 1];
+            if (typeof renderer === typeof []) {
+                viewport = renderer[1];
+                renderer = renderer[0];
+            }
+            this._renderers.push([new renderer(this), viewport]);
+        }
     } else {
-        this._renderer.optionsHaveChanged(changedOptions);
+        for (var i = 0; i < this._renderers.length; i++) {
+            this._renderers[i][0].optionsHaveChanged(changedOptions);
+        }
     }
     this.draw();
 };
@@ -96,7 +118,9 @@ WebGLSpins.prototype.updateSpins = function(instancePositions, instanceDirection
         console.error("The length of instancePositions and instanceDirections needs to be a multiple of 3");
         return;
     }
-    this._renderer.updateSpins(this._instancePositionArray, this._instanceDirectionArray);
+    for (var i = 0; i < this._renderers.length; i++) {
+        this._renderers[i][0].updateSpins(this._instancePositionArray, this._instanceDirectionArray);
+    }
     this.draw();
 };
 
@@ -110,9 +134,20 @@ WebGLSpins.prototype.draw = function() {
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     // Redraw
     gl.clearColor(this._options.backgroundColor[0], this._options.backgroundColor[1], this._options.backgroundColor[2], 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.clear(gl.COLOR_BUFFER_BIT);
 
-    this._renderer.draw();
+    for (var i = 0; i < this._renderers.length; i++) {
+        gl.viewport(
+            gl.drawingBufferWidth*this._renderers[i][1][0],
+            gl.drawingBufferHeight*this._renderers[i][1][1],
+            gl.drawingBufferWidth*this._renderers[i][1][2],
+            gl.drawingBufferHeight*this._renderers[i][1][3]);
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+        this._renderers[i][0].draw(
+            gl.drawingBufferWidth*this._renderers[i][1][2],
+            gl.drawingBufferHeight*this._renderers[i][1][3]
+        );
+    }
 };
 
 WebGLSpins.prototype._mergeOptions = function(options, defaultOptions) {
@@ -145,7 +180,9 @@ WebGLSpins.prototype._initGLContext = function() {
     gl.depthFunc(gl.LEQUAL);
     gl.enable(gl.CULL_FACE);
 
-    this._renderer.initGLContext();
+    for (var i = 0; i < this._renderers.length; i++) {
+        this._renderers[i][0].initGLContext();
+    }
 
     this._gl_initialized = true;
 };
@@ -295,7 +332,7 @@ WebGLSpins._matrixMultiply = function(matrix, vector) {
 };
 
 WebGLSpins._perspectiveProjectionMatrix = function(verticalFieldOfView, aspectRatio, zNear, zFar) {
-    var f = 1.0/Math.tan(verticalFieldOfView/2);
+    var f = 1.0/Math.tan(verticalFieldOfView*Math.PI/180/2);
     return [
         [f/aspectRatio, 0, 0, 0],
         [0, f, 0, 0],
@@ -350,18 +387,18 @@ WebGLSpins._ArrowRenderer = function(webglspins) {
         this.initGLContext();
     }
     if (webglspins._instancePositionArray != null && webglspins._instanceDirectionArray != null) {
-        this.updateSpins(webglspins._instancePositionArray, webglspins._instanceDirectionArray)
+        this.updateSpins(webglspins._instancePositionArray, webglspins._instanceDirectionArray);
     }
 };
 
-WebGLSpins.renderModes.ARROWS = WebGLSpins._ArrowRenderer;
+WebGLSpins.renderers.ARROWS = WebGLSpins._ArrowRenderer;
 
 WebGLSpins.defaultOptions.coneHeight = 0.6;
 WebGLSpins.defaultOptions.coneRadius = 0.25;
 WebGLSpins.defaultOptions.cylinderHeight = 0.7;
 WebGLSpins.defaultOptions.cylinderRadius = 0.125;
 WebGLSpins.defaultOptions.levelOfDetail = 20;
-WebGLSpins.defaultOptions.renderMode = WebGLSpins.renderModes.ARROWS;
+WebGLSpins.defaultOptions.renderers = [WebGLSpins.renderers.ARROWS];
 
 
 WebGLSpins._ArrowRenderer.prototype.optionsHaveChanged = function(changedOptions) {
@@ -390,7 +427,7 @@ WebGLSpins._ArrowRenderer.prototype.updateSpins = function(instancePositionArray
     gl.bufferData(gl.ARRAY_BUFFER, instanceDirectionArray, gl.STREAM_DRAW);
 };
 
-WebGLSpins._ArrowRenderer.prototype.draw = function() {
+WebGLSpins._ArrowRenderer.prototype.draw = function(width, height) {
     var gl = this._webglspins._gl;
     if (this._numInstances <= 0) {
         return;
@@ -416,8 +453,6 @@ WebGLSpins._ArrowRenderer.prototype.draw = function() {
 
     gl.useProgram(this._program);
 
-    var width = this._webglspins._canvas.clientWidth;
-    var height = this._webglspins._canvas.clientHeight;
     var projectionMatrix = WebGLSpins._perspectiveProjectionMatrix(this._options.verticalFieldOfView, width / height, 0.1, 10000);
     gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uProjectionMatrix"), false, WebGLSpins._toFloat32Array(projectionMatrix));
     var modelviewMatrix = WebGLSpins._lookAtMatrix(this._options.cameraLocation, this._options.centerLocation, this._options.upVector);
@@ -479,7 +514,7 @@ WebGLSpins._ArrowRenderer.prototype._updateShaderProgram = function() {
     gl.shaderSource(vertexShader, `
         #version 100
         precision highp float;
-        
+
         uniform mat4 uProjectionMatrix;
         uniform mat4 uModelviewMatrix;
         uniform vec2 uZRange;
@@ -490,7 +525,7 @@ WebGLSpins._ArrowRenderer.prototype._updateShaderProgram = function() {
         varying vec3 vfPosition;
         varying vec3 vfNormal;
         varying vec3 vfColor;
-        
+
         mat3 matrixFromDirection(vec3 direction) {
           float c = direction.z;
           float s = length(direction.xy);
@@ -508,9 +543,9 @@ WebGLSpins._ArrowRenderer.prototype._updateShaderProgram = function() {
           matrix[2][2] = c;
           return matrix;
         }
-        
+
         vec3 colormap(vec3 direction);
-        
+
         void main(void) {
           vfColor = colormap(normalize(ivInstanceDirection));
           mat3 instanceMatrix = matrixFromDirection(ivInstanceDirection);
@@ -533,12 +568,12 @@ WebGLSpins._ArrowRenderer.prototype._updateShaderProgram = function() {
     gl.shaderSource(fragmentShader, `
         #version 100
         precision highp float;
-        
+
         uniform vec3 uLightPosition;
         varying vec3 vfPosition;
         varying vec3 vfNormal;
         varying vec3 vfColor;
-        
+
         void main(void) {
           vec3 cameraLocation = vec3(0, 0, 0);
           vec3 normal = normalize(vfNormal);
@@ -699,11 +734,11 @@ WebGLSpins._SurfaceRenderer = function(webglspins) {
         this.initGLContext();
     }
     if (webglspins._instancePositionArray != null && webglspins._instanceDirectionArray != null) {
-        this.updateSpins(webglspins._instancePositionArray, webglspins._instanceDirectionArray)
+        this.updateSpins(webglspins._instancePositionArray, webglspins._instanceDirectionArray);
     }
 };
 
-WebGLSpins.renderModes.SURFACE = WebGLSpins._SurfaceRenderer;
+WebGLSpins.renderers.SURFACE = WebGLSpins._SurfaceRenderer;
 
 WebGLSpins.defaultOptions.surfaceIndices = [];
 
@@ -733,7 +768,7 @@ WebGLSpins._SurfaceRenderer.prototype.updateSpins = function(instancePositionArr
     gl.bufferData(gl.ARRAY_BUFFER, instanceDirectionArray, gl.STREAM_DRAW);
 };
 
-WebGLSpins._SurfaceRenderer.prototype.draw = function() {
+WebGLSpins._SurfaceRenderer.prototype.draw = function(width, height) {
     var gl = this._webglspins._gl;
     if (this._numIndices < 3) {
         return;
@@ -751,8 +786,6 @@ WebGLSpins._SurfaceRenderer.prototype.draw = function() {
 
     gl.useProgram(this._program);
 
-    var width = this._webglspins._canvas.clientWidth;
-    var height = this._webglspins._canvas.clientHeight;
     var projectionMatrix = WebGLSpins._perspectiveProjectionMatrix(this._options.verticalFieldOfView, width / height, 0.1, 10000);
     gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uProjectionMatrix"), false, WebGLSpins._toFloat32Array(projectionMatrix));
     var modelviewMatrix = WebGLSpins._lookAtMatrix(this._options.cameraLocation, this._options.centerLocation, this._options.upVector);
@@ -801,13 +834,13 @@ WebGLSpins._SurfaceRenderer.prototype._updateShaderProgram = function() {
     gl.shaderSource(vertexShader, `
         #version 100
         precision highp float;
-        
+
         uniform mat4 uProjectionMatrix;
         uniform mat4 uModelviewMatrix;
         attribute vec3 ivPosition;
         attribute vec3 ivDirection;
         varying vec3 vfDirection;
-        
+
         void main(void) {
           vfDirection = normalize(ivDirection);
           gl_Position = uProjectionMatrix * (uModelviewMatrix * vec4(ivPosition, 1.0));
@@ -823,12 +856,12 @@ WebGLSpins._SurfaceRenderer.prototype._updateShaderProgram = function() {
     gl.shaderSource(fragmentShader, `
         #version 100
         precision highp float;
-        
+
         uniform vec2 uZRange;
         varying vec3 vfDirection;
-        
+
         vec3 colormap(vec3 direction);
-        
+
         void main(void) {
           if (vfDirection.z >= uZRange.x && vfDirection.z <= uZRange.y) {
             vec3 color = colormap(normalize(vfDirection));
@@ -898,3 +931,290 @@ WebGLSpins.generateCartesianSurfaceIndices = function(nx, ny) {
     }
     return surfaceIndices;
 };
+
+// ---------------------------- Sphere Renderer -------------------------------
+
+WebGLSpins._SphereRenderer = function(webglspins) {
+    this._webglspins = webglspins;
+    this._options = webglspins._options;
+    this._program = null;
+    this._instanceDirectionVbo = null;
+    this._numInstances = 0;
+    if (webglspins._gl_initialized) {
+        this.initGLContext();
+    }
+    if (webglspins._instanceDirectionArray != null) {
+        this.updateSpins(null, webglspins._instanceDirectionArray);
+    }
+};
+
+WebGLSpins.renderers.SPHERE = WebGLSpins._SphereRenderer;
+
+WebGLSpins._SphereRenderer.prototype.optionsHaveChanged = function(changedOptions) {
+    var arrayContainsAny = function (array, values) {
+        for (var i = 0; i < values.length; i++) {
+            if (~array.indexOf(values[i])) {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (arrayContainsAny(changedOptions, ['colormapImplementation'])) {
+        this._updateShaderProgram();
+    }
+};
+
+WebGLSpins._SphereRenderer.prototype.updateSpins = function(instancePositionArray, instanceDirectionArray) {
+    var gl = this._webglspins._gl;
+    this._numInstances = instanceDirectionArray.length/3;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._instanceDirectionVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, instanceDirectionArray, gl.STREAM_DRAW);
+};
+
+WebGLSpins._SphereRenderer.prototype.draw = function(width, height) {
+    var gl = this._webglspins._gl;
+    if (this._numInstances <= 0) {
+        return;
+    }
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._instanceDirectionVbo);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
+
+    gl.useProgram(this._program);
+
+    var projectionMatrix = WebGLSpins._perspectiveProjectionMatrix(this._options.verticalFieldOfView, width / height, 0.1, 10000);
+    gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uProjectionMatrix"), false, WebGLSpins._toFloat32Array(projectionMatrix));
+    var modelviewMatrix = WebGLSpins._lookAtMatrix(WebGLSpins._normalize(WebGLSpins._difference(this._options.cameraLocation, this._options.centerLocation)), [0, 0, 0], this._options.upVector);
+    gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uModelviewMatrix"), false, WebGLSpins._toFloat32Array(modelviewMatrix));
+    gl.uniform2f(gl.getUniformLocation(this._program, "uZRange"), this._options.zRange[0], this._options.zRange[1]);
+    gl.uniform1f(gl.getUniformLocation(this._program, "uSinHalfVFoV"), Math.sin(this._options.verticalFieldOfView*0.5*Math.PI/180));
+
+    gl.disable(gl.CULL_FACE);
+    gl.drawArrays(gl.POINTS, 0, this._numInstances);
+    gl.enable(gl.CULL_FACE);
+};
+
+WebGLSpins._SphereRenderer.prototype.initGLContext = function() {
+    var gl = this._webglspins._gl;
+    this._instanceDirectionVbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._instanceDirectionVbo);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
+
+    this._updateShaderProgram();
+};
+
+WebGLSpins._SphereRenderer.prototype._updateShaderProgram = function() {
+    var gl = this._webglspins._gl;
+    if (this._program) {
+        gl.deleteProgram(this._program);
+    }
+
+    var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vertexShader, `
+        #version 100
+        precision highp float;
+
+        uniform mat4 uProjectionMatrix;
+        uniform mat4 uModelviewMatrix;
+        uniform float uSinHalfVFoV;
+        attribute vec3 ivDirection;
+        varying vec3 vfDirection;
+
+        void main(void) {
+          vfDirection = normalize(ivDirection);
+          gl_Position = uProjectionMatrix * (uModelviewMatrix * vec4(ivDirection*uSinHalfVFoV*0.99, 1.0));
+        }
+    `);
+    gl.compileShader(vertexShader);
+    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+        console.error("vertex shader info log:\n" + gl.getShaderInfoLog(vertexShader));
+        return;
+    }
+
+    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fragmentShader, `
+        #version 100
+        precision highp float;
+
+        uniform vec2 uZRange;
+        varying vec3 vfDirection;
+
+        vec3 colormap(vec3 direction);
+
+        void main(void) {
+          if (vfDirection.z >= uZRange.x && vfDirection.z <= uZRange.y) {
+            vec3 color = colormap(normalize(vfDirection));
+            gl_FragColor = vec4(color, 1.0);
+          } else {
+            discard;
+          }
+        }
+    `+this._options.colormapImplementation);
+    gl.compileShader(fragmentShader);
+    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+        console.error("fragment shader info log:\n" + gl.getShaderInfoLog(fragmentShader));
+        return;
+    }
+
+    var program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.bindAttribLocation(program, 0, 'ivDirection');
+    gl.linkProgram(program);
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error("program info log:\n" + gl.getProgramInfoLog(program));
+        return;
+    }
+    this._program = program;
+};
+
+WebGLSpins._SphereRenderer.prototype.cleanup = function() {
+    var gl = this._webglspins._gl;
+    gl.deleteBuffer(this._instanceDirectionVbo);
+    gl.deleteProgram(this._program);
+    gl.disableVertexAttribArray(0);
+};
+
+// ----------------------- Coordinate System Renderer -------------------------
+
+WebGLSpins._CoordinateSystemRenderer = function(webglspins) {
+    this._webglspins = webglspins;
+    this._options = webglspins._options;
+    this._program = null;
+    this._lineVbo = null;
+    if (webglspins._gl_initialized) {
+        this.initGLContext();
+    }
+};
+
+WebGLSpins.renderers.COORDINATESYSTEM = WebGLSpins._CoordinateSystemRenderer;
+
+WebGLSpins._CoordinateSystemRenderer.prototype.optionsHaveChanged = function(changedOptions) {
+    var arrayContainsAny = function (array, values) {
+        for (var i = 0; i < values.length; i++) {
+            if (~array.indexOf(values[i])) {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (arrayContainsAny(changedOptions, ['colormapImplementation'])) {
+        this._updateShaderProgram();
+    }
+};
+
+WebGLSpins._CoordinateSystemRenderer.prototype.updateSpins = function(instancePositionArray, instanceDirectionArray) {};
+
+WebGLSpins._CoordinateSystemRenderer.prototype.draw = function(width, height) {
+    var gl = this._webglspins._gl;
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._lineVbo);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
+
+    gl.useProgram(this._program);
+
+    var projectionMatrix = WebGLSpins._perspectiveProjectionMatrix(this._options.verticalFieldOfView, width / height, 0.1, 10000);
+    gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uProjectionMatrix"), false, WebGLSpins._toFloat32Array(projectionMatrix));
+    var modelviewMatrix = WebGLSpins._lookAtMatrix(WebGLSpins._normalize(WebGLSpins._difference(this._options.cameraLocation, this._options.centerLocation)), [0, 0, 0], this._options.upVector);
+    gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uModelviewMatrix"), false, WebGLSpins._toFloat32Array(modelviewMatrix));
+    gl.uniform1f(gl.getUniformLocation(this._program, "uSinHalfVFoV"), Math.sin(this._options.verticalFieldOfView*0.5*Math.PI/180));
+
+    gl.disable(gl.CULL_FACE);
+    gl.drawArrays(gl.LINES, 0, 6);
+    gl.enable(gl.CULL_FACE);
+};
+
+WebGLSpins._CoordinateSystemRenderer.prototype.initGLContext = function() {
+    var gl = this._webglspins._gl;
+    this._lineVbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._lineVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        0, 0, 0,
+        1, 0, 0,
+        0, 0, 0,
+        0, 1, 0,
+        0, 0, 0,
+        0, 0, 1]), gl.STREAM_DRAW);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
+
+    this._updateShaderProgram();
+};
+
+WebGLSpins._CoordinateSystemRenderer.prototype._updateShaderProgram = function() {
+    var gl = this._webglspins._gl;
+    if (this._program) {
+        gl.deleteProgram(this._program);
+    }
+
+    var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vertexShader, `
+        #version 100
+        precision highp float;
+
+        uniform mat4 uProjectionMatrix;
+        uniform mat4 uModelviewMatrix;
+        uniform float uSinHalfVFoV;
+        attribute vec3 ivDirection;
+        varying vec3 vfDirection;
+
+        void main(void) {
+          vfDirection = ivDirection;
+          gl_Position = uProjectionMatrix * (uModelviewMatrix * vec4(ivDirection*uSinHalfVFoV*0.99, 1.0));
+        }
+    `);
+    gl.compileShader(vertexShader);
+    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+        console.error("vertex shader info log:\n" + gl.getShaderInfoLog(vertexShader));
+        return;
+    }
+
+    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fragmentShader, `
+        #version 100
+        precision highp float;
+
+        uniform vec2 uZRange;
+        varying vec3 vfDirection;
+
+        vec3 colormap(vec3 direction);
+
+        void main(void) {
+          vec3 color = colormap(normalize(vfDirection));
+          gl_FragColor = vec4(color, 1.0);
+        }
+    `+this._options.colormapImplementation);
+    gl.compileShader(fragmentShader);
+    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+        console.error("fragment shader info log:\n" + gl.getShaderInfoLog(fragmentShader));
+        return;
+    }
+
+    var program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.bindAttribLocation(program, 0, 'ivDirection');
+    gl.linkProgram(program);
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error("program info log:\n" + gl.getProgramInfoLog(program));
+        return;
+    }
+    this._program = program;
+};
+
+WebGLSpins._CoordinateSystemRenderer.prototype.cleanup = function() {
+    var gl = this._webglspins._gl;
+    gl.deleteBuffer(this._lineVbo);
+    gl.deleteProgram(this._program);
+    gl.disableVertexAttribArray(0);
+};
+
