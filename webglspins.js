@@ -950,6 +950,8 @@ WebGLSpins._SphereRenderer = function(webglspins) {
 
 WebGLSpins.renderers.SPHERE = WebGLSpins._SphereRenderer;
 
+WebGLSpins.defaultOptions.pointSize = 1.0;
+
 WebGLSpins._SphereRenderer.prototype.optionsHaveChanged = function(changedOptions) {
     var arrayContainsAny = function (array, values) {
         for (var i = 0; i < values.length; i++) {
@@ -989,6 +991,7 @@ WebGLSpins._SphereRenderer.prototype.draw = function(width, height) {
     gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uModelviewMatrix"), false, WebGLSpins._toFloat32Array(modelviewMatrix));
     gl.uniform2f(gl.getUniformLocation(this._program, "uZRange"), this._options.zRange[0], this._options.zRange[1]);
     gl.uniform1f(gl.getUniformLocation(this._program, "uSinHalfVFoV"), Math.sin(this._options.verticalFieldOfView*0.5*Math.PI/180));
+    gl.uniform1f(gl.getUniformLocation(this._program, "uPointSize"), Math.floor(this._options.pointSize));
 
     gl.disable(gl.CULL_FACE);
     gl.drawArrays(gl.POINTS, 0, this._numInstances);
@@ -1019,12 +1022,14 @@ WebGLSpins._SphereRenderer.prototype._updateShaderProgram = function() {
         uniform mat4 uProjectionMatrix;
         uniform mat4 uModelviewMatrix;
         uniform float uSinHalfVFoV;
+        uniform float uPointSize;
         attribute vec3 ivDirection;
         varying vec3 vfDirection;
 
         void main(void) {
           vfDirection = normalize(ivDirection);
           gl_Position = uProjectionMatrix * (uModelviewMatrix * vec4(ivDirection*uSinHalfVFoV*0.99, 1.0));
+          gl_PointSize = uPointSize;
         }
     `);
     gl.compileShader(vertexShader);
