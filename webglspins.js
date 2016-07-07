@@ -187,6 +187,43 @@ WebGLSpins.prototype._initGLContext = function() {
     this._gl_initialized = true;
 };
 
+
+WebGLSpins._createProgram = function(gl, vertexShaderSource, fragmentShaderSource, attributes) {
+
+    var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vertexShader, vertexShaderSource);
+    gl.compileShader(vertexShader);
+    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+        console.error("vertex shader info log:\n" + gl.getShaderInfoLog(vertexShader));
+        return null;
+    }
+
+    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fragmentShader, fragmentShaderSource);
+    gl.compileShader(fragmentShader);
+    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+        console.error("fragment shader info log:\n" + gl.getShaderInfoLog(fragmentShader));
+        return null;
+    }
+
+    var program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    for (var i = 0; i < attributes.length; i++) {
+        gl.bindAttribLocation(program, i, attributes[i]);
+    }
+    gl.linkProgram(program);
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error("program info log:\n" + gl.getProgramInfoLog(program));
+        return null;
+    }
+    return program;
+};
+
+
 // ---------------------------- Camera Movement -------------------------------
 
 WebGLSpins.prototype._handleMouseDown = function(event) {
@@ -276,7 +313,7 @@ WebGLSpins.prototype.zoom = function(delta) {
     this._options.cameraLocation[1] = this._options.centerLocation[1] - (1+0.02*delta) * forwardVector[1];
     this._options.cameraLocation[2] = this._options.centerLocation[2] - (1+0.02*delta) * forwardVector[2];
     this.draw();
-}
+};
 
 
 // ----------------------- Linear Algebra Utilities ---------------------------
@@ -510,8 +547,8 @@ WebGLSpins._ArrowRenderer.prototype._updateShaderProgram = function() {
         gl.deleteProgram(this._program);
     }
 
-    var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, `
+    var program = WebGLSpins._createProgram(gl,
+        `
         #version 100
         precision highp float;
 
@@ -557,15 +594,8 @@ WebGLSpins._ArrowRenderer.prototype._updateShaderProgram = function() {
             gl_Position = vec4(2.0, 2.0, 2.0, 0.0);
           }
         }
-    `+this._options.colormapImplementation);
-    gl.compileShader(vertexShader);
-    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-        console.error("vertex shader info log:\n" + gl.getShaderInfoLog(vertexShader));
-        return;
-    }
-
-    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, `
+        `+this._options.colormapImplementation,
+        `
         #version 100
         precision highp float;
 
@@ -584,28 +614,10 @@ WebGLSpins._ArrowRenderer.prototype._updateShaderProgram = function() {
           float ambient = 0.2;
           gl_FragColor = vec4((ambient+diffuse)*vfColor + specular*vec3(1, 1, 1), 1.0);
         }
-    `);
-    gl.compileShader(fragmentShader);
-    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-        console.error("fragment shader info log:\n" + gl.getShaderInfoLog(fragmentShader));
-        return;
-    }
-
-    var program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.bindAttribLocation(program, 0, 'ivPosition');
-    gl.bindAttribLocation(program, 1, 'ivNormal');
-    gl.bindAttribLocation(program, 2, 'ivInstanceOffset');
-    gl.bindAttribLocation(program, 3, 'ivInstanceDirection');
-    gl.linkProgram(program);
-    gl.deleteShader(vertexShader);
-    gl.deleteShader(fragmentShader);
-
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        console.error("program info log:\n" + gl.getProgramInfoLog(program));
-        return;
-    }
+        `,
+        ['ivPosition', 'ivNormal', 'ivInstanceOffset', 'ivInstanceDirection']
+    );
+    if (program == null) return;
     this._program = program;
 };
 
@@ -829,9 +841,8 @@ WebGLSpins._SurfaceRenderer.prototype._updateShaderProgram = function() {
     if (this._program) {
         gl.deleteProgram(this._program);
     }
-
-    var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, `
+    var program = WebGLSpins._createProgram(gl,
+        `
         #version 100
         precision highp float;
 
@@ -845,15 +856,7 @@ WebGLSpins._SurfaceRenderer.prototype._updateShaderProgram = function() {
           vfDirection = normalize(ivDirection);
           gl_Position = uProjectionMatrix * (uModelviewMatrix * vec4(ivPosition, 1.0));
         }
-    `);
-    gl.compileShader(vertexShader);
-    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-        console.error("vertex shader info log:\n" + gl.getShaderInfoLog(vertexShader));
-        return;
-    }
-
-    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, `
+        `, `
         #version 100
         precision highp float;
 
@@ -870,26 +873,10 @@ WebGLSpins._SurfaceRenderer.prototype._updateShaderProgram = function() {
             discard;
           }
         }
-    `+this._options.colormapImplementation);
-    gl.compileShader(fragmentShader);
-    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-        console.error("fragment shader info log:\n" + gl.getShaderInfoLog(fragmentShader));
-        return;
-    }
-
-    var program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.bindAttribLocation(program, 0, 'ivPosition');
-    gl.bindAttribLocation(program, 1, 'ivDirection');
-    gl.linkProgram(program);
-    gl.deleteShader(vertexShader);
-    gl.deleteShader(fragmentShader);
-
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        console.error("program info log:\n" + gl.getProgramInfoLog(program));
-        return;
-    }
+        `+this._options.colormapImplementation,
+        ['ivPosition', 'ivDirection']
+    );
+    if (program == null) return;
     this._program = program;
 };
 
@@ -951,6 +938,7 @@ WebGLSpins._SphereRenderer = function(webglspins) {
 WebGLSpins.renderers.SPHERE = WebGLSpins._SphereRenderer;
 
 WebGLSpins.defaultOptions.pointSize = 1.0;
+WebGLSpins.defaultOptions.innerSphereRadius = 0.95;
 
 WebGLSpins._SphereRenderer.prototype.optionsHaveChanged = function(changedOptions) {
     var arrayContainsAny = function (array, values) {
@@ -975,6 +963,24 @@ WebGLSpins._SphereRenderer.prototype.updateSpins = function(instancePositionArra
 
 WebGLSpins._SphereRenderer.prototype.draw = function(width, height) {
     var gl = this._webglspins._gl;
+    if (this._options.innerSphereRadius > 0.0) {
+        if (this._options.innerSphereRadius > 0.99) {
+            this._options.innerSphereRadius = 0.99;
+        }
+        gl.useProgram(this._program2);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._fakeSphereVbo);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(0);
+        gl.uniform1f(gl.getUniformLocation(this._program2, "uAspectRatio"), width / height);
+    gl.uniform1f(gl.getUniformLocation(this._program2, "uInnerSphereRadius"), this._options.innerSphereRadius);
+        gl.disable(gl.CULL_FACE);
+        gl.depthMask(false);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.depthMask(true);
+        gl.enable(gl.CULL_FACE);
+    }
+
     if (this._numInstances <= 0) {
         return;
     }
@@ -992,6 +998,8 @@ WebGLSpins._SphereRenderer.prototype.draw = function(width, height) {
     gl.uniform2f(gl.getUniformLocation(this._program, "uZRange"), this._options.zRange[0], this._options.zRange[1]);
     gl.uniform1f(gl.getUniformLocation(this._program, "uSinHalfVFoV"), Math.sin(this._options.verticalFieldOfView*0.5*Math.PI/180));
     gl.uniform1f(gl.getUniformLocation(this._program, "uPointSize"), Math.floor(this._options.pointSize));
+    gl.uniform1f(gl.getUniformLocation(this._program, "uAspectRatio"), width / height);
+    gl.uniform1f(gl.getUniformLocation(this._program, "uInnerSphereRadius"), this._options.innerSphereRadius);
 
     gl.disable(gl.CULL_FACE);
     gl.drawArrays(gl.POINTS, 0, this._numInstances);
@@ -1004,6 +1012,17 @@ WebGLSpins._SphereRenderer.prototype.initGLContext = function() {
     gl.bindBuffer(gl.ARRAY_BUFFER, this._instanceDirectionVbo);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(0);
+    this._fakeSphereVbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._fakeSphereVbo);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1, 0,
+        1, -1, 0,
+        -1, 1, 0,
+        -1, 1, 0,
+        1, -1, 0,
+        1, 1, 0]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
 
     this._updateShaderProgram();
 };
@@ -1014,8 +1033,8 @@ WebGLSpins._SphereRenderer.prototype._updateShaderProgram = function() {
         gl.deleteProgram(this._program);
     }
 
-    var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, `
+    var program = WebGLSpins._createProgram(gl,
+        `
         #version 100
         precision highp float;
 
@@ -1023,23 +1042,24 @@ WebGLSpins._SphereRenderer.prototype._updateShaderProgram = function() {
         uniform mat4 uModelviewMatrix;
         uniform float uSinHalfVFoV;
         uniform float uPointSize;
+        uniform float uAspectRatio;
+        uniform float uInnerSphereRadius;
         attribute vec3 ivDirection;
         varying vec3 vfDirection;
 
         void main(void) {
           vfDirection = normalize(ivDirection);
-          gl_Position = uProjectionMatrix * (uModelviewMatrix * vec4(ivDirection*uSinHalfVFoV*0.99, 1.0));
-          gl_PointSize = uPointSize;
+          vec4 position = uProjectionMatrix * (uModelviewMatrix * vec4(vfDirection*uSinHalfVFoV*0.99, 1.0));
+          vec4 rotatedPosition = uModelviewMatrix * vec4(vfDirection, 0.0);
+          vec3 screenPosition = vec3(position.x * uAspectRatio, position.y,  position.z)/position.w;
+          float l = length(screenPosition.xy);
+          if ((l <= uInnerSphereRadius) && (rotatedPosition.z < uSinHalfVFoV*0.99)) {
+            position = vec4(2.0, 2.0, 2.0, 1.0);
+          }
+          gl_Position = position;
+          gl_PointSize = uPointSize * abs(rotatedPosition.z);
         }
-    `);
-    gl.compileShader(vertexShader);
-    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-        console.error("vertex shader info log:\n" + gl.getShaderInfoLog(vertexShader));
-        return;
-    }
-
-    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, `
+        `, `
         #version 100
         precision highp float;
 
@@ -1056,32 +1076,54 @@ WebGLSpins._SphereRenderer.prototype._updateShaderProgram = function() {
             discard;
           }
         }
-    `+this._options.colormapImplementation);
-    gl.compileShader(fragmentShader);
-    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-        console.error("fragment shader info log:\n" + gl.getShaderInfoLog(fragmentShader));
-        return;
-    }
+        `+this._options.colormapImplementation,
+        ['ivDirection']
+    );
+    if (program == null) return;
+    var program2 = WebGLSpins._createProgram(gl,
+        `
+        #version 100
+        precision highp float;
 
-    var program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.bindAttribLocation(program, 0, 'ivDirection');
-    gl.linkProgram(program);
-    gl.deleteShader(vertexShader);
-    gl.deleteShader(fragmentShader);
+        uniform float uAspectRatio;
+        uniform float uInnerSphereRadius;
+        attribute vec3 ivPosition;
+        varying vec3 vfPosition;
 
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        console.error("program info log:\n" + gl.getProgramInfoLog(program));
-        return;
-    }
+        void main(void) {
+          vfPosition = ivPosition;
+          gl_Position = vec4(vfPosition.xy*vec2(uInnerSphereRadius/uAspectRatio, uInnerSphereRadius), 0.0, 1.0);
+        }
+        `, `
+        #version 100
+        precision highp float;
+
+        varying vec3 vfPosition;
+
+
+        void main(void) {
+          float l = length(vfPosition);
+          if (l > 1.0) {
+            discard;
+          } else {
+            vec3 color = 0.2+0.4*sqrt(1.0-l*l)*vec3(1.0, 1.0, 1.0);
+            gl_FragColor = vec4(color, 1.0);
+          }
+        }
+        `,
+        ['ivPosition']
+    );
+    if (program2 == null) return;
     this._program = program;
+    this._program2 = program2;
 };
 
 WebGLSpins._SphereRenderer.prototype.cleanup = function() {
     var gl = this._webglspins._gl;
     gl.deleteBuffer(this._instanceDirectionVbo);
+    gl.deleteBuffer(this._fakeSphereVbo);
     gl.deleteProgram(this._program);
+    gl.deleteProgram(this._program2);
     gl.disableVertexAttribArray(0);
 };
 
@@ -1145,7 +1187,7 @@ WebGLSpins._CoordinateSystemRenderer.prototype.initGLContext = function() {
         0, 0, 0,
         0, 1, 0,
         0, 0, 0,
-        0, 0, 1]), gl.STREAM_DRAW);
+        0, 0, 1]), gl.STATIC_DRAW);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(0);
 
@@ -1158,8 +1200,8 @@ WebGLSpins._CoordinateSystemRenderer.prototype._updateShaderProgram = function()
         gl.deleteProgram(this._program);
     }
 
-    var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, `
+    var program = WebGLSpins._createProgram(gl,
+        `
         #version 100
         precision highp float;
 
@@ -1173,15 +1215,7 @@ WebGLSpins._CoordinateSystemRenderer.prototype._updateShaderProgram = function()
           vfDirection = ivDirection;
           gl_Position = uProjectionMatrix * (uModelviewMatrix * vec4(ivDirection*uSinHalfVFoV*0.99, 1.0));
         }
-    `);
-    gl.compileShader(vertexShader);
-    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-        console.error("vertex shader info log:\n" + gl.getShaderInfoLog(vertexShader));
-        return;
-    }
-
-    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, `
+        `, `
         #version 100
         precision highp float;
 
@@ -1194,25 +1228,10 @@ WebGLSpins._CoordinateSystemRenderer.prototype._updateShaderProgram = function()
           vec3 color = colormap(normalize(vfDirection));
           gl_FragColor = vec4(color, 1.0);
         }
-    `+this._options.colormapImplementation);
-    gl.compileShader(fragmentShader);
-    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-        console.error("fragment shader info log:\n" + gl.getShaderInfoLog(fragmentShader));
-        return;
-    }
-
-    var program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.bindAttribLocation(program, 0, 'ivDirection');
-    gl.linkProgram(program);
-    gl.deleteShader(vertexShader);
-    gl.deleteShader(fragmentShader);
-
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        console.error("program info log:\n" + gl.getProgramInfoLog(program));
-        return;
-    }
+        `+this._options.colormapImplementation,
+        ['ivDirection']
+    );
+    if (program == null) return;
     this._program = program;
 };
 
