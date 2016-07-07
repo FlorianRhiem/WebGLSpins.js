@@ -65,6 +65,7 @@ Sphere renderer options:
 | Options | Type | Default | Description |
 |---|:-:|:-:|---|
 | pointSize | Number | 1 | Size of each individual point. |
+| innerSphereRadius | Number | 0.95 | Radius of the gray sphere rendered inside the spin sphere. Use a radius of 0.0 to disable the sphere. |
 
 To change these options later on, use:
 ```js
