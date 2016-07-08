@@ -1006,7 +1006,7 @@ WebGLSpins._SphereRenderer.prototype.draw = function(width, height) {
 
     gl.useProgram(this._program);
 
-    var projectionMatrix = WebGLSpins._orthographicProjectionMatrix(-width / height, width / height, -1, 1, 1, -1);
+    var projectionMatrix = WebGLSpins._orthographicProjectionMatrix(-width / height, width / height, -1, 1, 2, 0);
     gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uProjectionMatrix"), false, WebGLSpins._toFloat32Array(projectionMatrix));
     var modelviewMatrix = WebGLSpins._lookAtMatrix(WebGLSpins._normalize(WebGLSpins._difference(this._options.cameraLocation, this._options.centerLocation)), [0, 0, 0], this._options.upVector);
     gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uModelviewMatrix"), false, WebGLSpins._toFloat32Array(modelviewMatrix));
