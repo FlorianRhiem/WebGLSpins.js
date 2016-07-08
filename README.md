@@ -64,8 +64,9 @@ Sphere renderer options:
 
 | Options | Type | Default | Description |
 |---|:-:|:-:|---|
-| pointSize | Number | 1 | Size of each individual point. |
 | innerSphereRadius | Number | 0.95 | Radius of the gray sphere rendered inside the spin sphere. Use a radius of 0.0 to disable the sphere. |
+| useFakePerspective | Boolean | false | The spin sphere is rendered using an orthographic perspective. If you wish to make distant points smaller anyway, set this option to true. |
+| pointSizeRange | Array | [1,1] | Point size can vary due to position on the sphere and distance to the viewer (in case of the fake perspective). This sets the valid point size range. |
 
 To change these options later on, use:
 ```js
