@@ -204,16 +204,22 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 </thead>
 <tbody>
 <tr class="odd">
-<td align="left">pointSize</td>
-<td align="center">Number</td>
-<td align="center">1</td>
-<td align="left">Size of each individual point.</td>
-</tr>
-<tr class="even">
 <td align="left">innerSphereRadius</td>
 <td align="center">Number</td>
 <td align="center">0.95</td>
 <td align="left">Radius of the gray sphere rendered inside the spin sphere. Use a radius of 0.0 to disable the sphere.</td>
+</tr>
+<tr class="even">
+<td align="left">useFakePerspective</td>
+<td align="center">Boolean</td>
+<td align="center">false</td>
+<td align="left">The spin sphere is rendered using an orthographic perspective. If you wish to make distant points smaller anyway, set this option to true.</td>
+</tr>
+<tr class="odd">
+<td align="left">pointSizeRange</td>
+<td align="center">Array</td>
+<td align="center">[1,1]</td>
+<td align="left">Point size can vary due to position on the sphere and distance to the viewer (in case of the fake perspective). This sets the valid point size range.</td>
 </tr>
 </tbody>
 </table>
