@@ -952,8 +952,9 @@ WebGLSpins._SphereRenderer = function(webglspins) {
 
 WebGLSpins.renderers.SPHERE = WebGLSpins._SphereRenderer;
 
-WebGLSpins.defaultOptions.pointSize = 1.0;
+WebGLSpins.defaultOptions.pointSizeRange = [1.0, 1.0];
 WebGLSpins.defaultOptions.innerSphereRadius = 0.95;
+WebGLSpins.defaultOptions.useSphereFakePerspective = false;
 
 WebGLSpins._SphereRenderer.prototype.optionsHaveChanged = function(changedOptions) {
     var arrayContainsAny = function (array, values) {
@@ -1011,9 +1012,14 @@ WebGLSpins._SphereRenderer.prototype.draw = function(width, height) {
     var modelviewMatrix = WebGLSpins._lookAtMatrix(WebGLSpins._normalize(WebGLSpins._difference(this._options.cameraLocation, this._options.centerLocation)), [0, 0, 0], this._options.upVector);
     gl.uniformMatrix4fv(gl.getUniformLocation(this._program, "uModelviewMatrix"), false, WebGLSpins._toFloat32Array(modelviewMatrix));
     gl.uniform2f(gl.getUniformLocation(this._program, "uZRange"), this._options.zRange[0], this._options.zRange[1]);
-    gl.uniform1f(gl.getUniformLocation(this._program, "uPointSize"), Math.floor(this._options.pointSize));
+    gl.uniform2f(gl.getUniformLocation(this._program, "uPointSizeRange"), Math.floor(this._options.pointSizeRange[0]), Math.floor(this._options.pointSizeRange[1]));
     gl.uniform1f(gl.getUniformLocation(this._program, "uAspectRatio"), width / height);
     gl.uniform1f(gl.getUniformLocation(this._program, "uInnerSphereRadius"), this._options.innerSphereRadius);
+    if (this._options.useSphereFakePerspective) {
+      gl.uniform1f(gl.getUniformLocation(this._program, "uUseFakePerspective"), 1.0);
+    } else {
+      gl.uniform1f(gl.getUniformLocation(this._program, "uUseFakePerspective"), 0.0);
+    }
 
     gl.disable(gl.CULL_FACE);
     gl.drawArrays(gl.POINTS, 0, this._numInstances);
@@ -1054,9 +1060,10 @@ WebGLSpins._SphereRenderer.prototype._updateShaderProgram = function() {
 
         uniform mat4 uProjectionMatrix;
         uniform mat4 uModelviewMatrix;
-        uniform float uPointSize;
+        uniform vec2 uPointSizeRange;
         uniform float uAspectRatio;
         uniform float uInnerSphereRadius;
+        uniform float uUseFakePerspective;
         attribute vec3 ivDirection;
         varying vec3 vfDirection;
 
@@ -1069,7 +1076,7 @@ WebGLSpins._SphereRenderer.prototype._updateShaderProgram = function() {
           if ((clipRadius <= uInnerSphereRadius) && (rotatedDirectionZ < 0.0)) {
             gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
           }
-          gl_PointSize = uPointSize * sqrt(max(0.0, 1.0-clipRadius*clipRadius));
+          gl_PointSize = uPointSizeRange.x + (uPointSizeRange.y-uPointSizeRange.x) * sqrt(max(0.0, 1.0-clipRadius*clipRadius)) * (5.0-uUseFakePerspective*gl_Position.z) / 5.0;
         }
         `, `
         #version 100
