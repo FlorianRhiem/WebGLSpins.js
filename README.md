@@ -43,6 +43,8 @@ var webglspins = WebGLSpins(<HTMLCanvasElement> canvas, <options> options?);
 | colormapImplementation | String | red&nbsp;(see&nbsp;below) | GLSL code for mapping spin direction to a color. |
 | renderers | Array | [Arrows]&nbsp;(see&nbsp;below) | Array of renderers to use and (optionally) their viewports. |
 | zRange | Array | [-1, 1] | The range of visible z values. Spins with a direction z component outside this range will not be rendered. |
+| boundingBox | Array | null | The bounding box to be rendered around the spins, or null. The value should be in the form of [xmin, ymin, zmin, xmax, ymax, zmax] |
+| boundingBoxColor | Array | [1, 1, 1] | The color to be used for rendering the bounding box. |
 
 Arrow renderer options:
 
